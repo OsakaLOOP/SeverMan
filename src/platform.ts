@@ -97,6 +97,18 @@ export async function registerPlatform(app: FastifyInstance, database: DatabaseR
       } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
     });
     api.get("/v1/resources", async (request) => { await user(request); return { items: (await database.primary.query("SELECT r.id,r.service_id,r.columns FROM core.resources r JOIN core.services s ON s.id=r.service_id WHERE s.state='active' ORDER BY r.id")).rows }; });
+    api.get("/v1/site-profiles/railround", async (request) => {
+      const current = await user(request);
+      let snapshot;
+      try {
+        snapshot = await readResources(database.primary, database.reader, current.id, ["railround_profile"], 1, 0);
+      } catch (error) {
+        if (error instanceof HttpError && error.code === "RESOURCE_NOT_FOUND") return { profile: null, observed_at: new Date().toISOString(), available: false };
+        throw error;
+      }
+      const rows = snapshot.data.railround_profile as Record<string, unknown>[] | undefined;
+      return { profile: rows?.[0] ?? null, observed_at: snapshot.observed_at, available: true };
+    });
     api.post<{ Body: { resources: string[]; after_operation_id?: string; limit?: number; offset?: number } }>("/v1/query", { schema: { body: { type: "object", additionalProperties: false, required: ["resources"], properties: { resources: { type: "array", items: { type: "string", maxLength: 100 }, minItems: 1, maxItems: 6, uniqueItems: true }, after_operation_id: { type: "string", format: "uuid" }, limit: { type: "integer", minimum: 1, maximum: 100 }, offset: { type: "integer", minimum: 0, maximum: 10000 } } } } }, async (request, reply) => {
       const current = await user(request);
       if (request.body.after_operation_id) {

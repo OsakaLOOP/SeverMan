@@ -52,6 +52,10 @@
 
 ## 验证记录与入口
 
+## RailRound 迁移路线
+
+RailRound 作为独立仓库按四个阶段推进：第一阶段完成 profile 投影、PostgreSQL 行程主链路和身份映射；第二阶段完成 KV 受控分页导出、pins/folders/mileage events 表迁移、OIDC BFF 与同源 Function 代理；第三阶段迁移公开卡片和订阅状态，接入 HMAC 命令、幂等结果及跨站任务等待；第四阶段执行最终增量导入、停写切换、备份恢复演练、容量验收和旧 KV 下线。详细文件入口见 `../PyDesign/RailRound/docs/center-migration.md`。
+
 本机已通过 16 项真实 PostgreSQL 集成测试、TypeScript 检查、生产构建、桌面/移动浏览器检查，生产依赖审计 0 项漏洞。测试覆盖 OIDC 两客户端、真实 HTTP BFF、PKCE/state、令牌轮换、邮件重置、TOTP/恢复码、全站撤销、跨站快照、签名命令、重复投递和任务恢复。支付已验证原文签名与事件去重。
 
 Docker 运行、真实 GitHub/SMTP/OSS/Stripe 账号通信、EdgeOne 发布、实际站点迁移和整机性能在目标环境验收。性能数值属于验收目标。

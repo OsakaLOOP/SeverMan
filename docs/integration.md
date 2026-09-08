@@ -17,6 +17,8 @@ SDK 为 TypeScript 源码，独立仓库引入 `sdk/`、`src/security.ts`、`src
 
 本地 origin 默认 `http://127.0.0.1:4100`，中心登记 native client 以允许 loopback；生产登记 HTTPS web client。样板提供 API，业务 React 页面由各站维护，上线时调整监听地址和容器配置。
 
+RailRound 使用专用 profile 投影。中心只登记 `examples/railround-resource.json`，读取 `site_railround.profile_public_v1` 中的 `display_name`、会员等级、累计统计和公开徽章状态；中心 API 不返回 RailRound 的 trips、pins、folders、mileage events、card key、密码、外部账号 token 或订阅明细，也没有编辑该资料的路由。`/v1/site-profiles/railround` 在视图尚未登记时返回 `available=false`。
+
 笔记列表参数 `after` UUID、`limit`，响应 `next_cursor`；PATCH 携带 `version`，过期版本返回 409。`getUser(request, true)` 强制在线核对授权，适合敏感修改。
 
 ## 只读资源

@@ -22,6 +22,7 @@ import {
   GitBranch as Github,
   Activity,
   Copy,
+  UserRound,
 } from "lucide-react";
 import "./style.css";
 
@@ -149,6 +150,7 @@ function App() {
   );
   const [otp, setOtp] = useState(false);
   const [backupMode, setBackupMode] = useState(false);
+  const [railroundProfile, setRailroundProfile] = useState<Record<string, unknown> | null>(null);
 
   async function refresh() {
     const current = await api<Me>("/v1/me");
@@ -193,6 +195,12 @@ function App() {
           .catch(() => {});
     }, 3000);
     return () => clearInterval(timer);
+  }, [tab, me?.user.id]);
+  useEffect(() => {
+    if (tab !== "railround" || !me) return;
+    api<{ profile: Record<string, unknown> | null }>("/v1/site-profiles/railround")
+      .then((response) => setRailroundProfile(response.profile))
+      .catch((error) => setError(error instanceof Error ? error.message : "RailRound 资料暂不可用"));
   }, [tab, me?.user.id]);
   useEffect(() => {
     if (tab === "security" && me)
@@ -423,6 +431,7 @@ function App() {
     { id: "services", label: "服务", icon: LayoutGrid },
     { id: "operations", label: "任务", icon: ListTodo },
     { id: "data", label: "数据", icon: Database },
+    { id: "railround", label: "RailRound资料", icon: UserRound },
     { id: "security", label: "账号安全", icon: Shield },
     { id: "billing", label: "订阅", icon: CreditCard },
     ...(me.admin ? [{ id: "admin", label: "管理", icon: Settings }] : []),
@@ -778,6 +787,24 @@ function App() {
                 }}
               />
             </label>
+          </section>
+        )}
+        {tab === "railround" && (
+          <section>
+            <h2>RailRound 资料</h2>
+            <p className="muted">仅显示 RailRound 明确发布的资料字段。行程、图钉、文件、登录凭据和订阅凭据由 RailRound 独立管理。</p>
+            {railroundProfile ? (
+              <div className="profile-grid">
+                <div><span>显示名称</span><strong>{String(railroundProfile.display_name ?? "未设置")}</strong></div>
+                <div><span>会员等级</span><strong>{String(railroundProfile.tier ?? "free")}</strong></div>
+                <div><span>累计行程</span><strong>{String(railroundProfile.total_trips ?? 0)}</strong></div>
+                <div><span>累计距离</span><strong>{String(railroundProfile.total_distance_km ?? 0)} km</strong></div>
+                <div><span>涉及线路</span><strong>{String(railroundProfile.total_lines ?? 0)}</strong></div>
+                <div><span>公开徽章</span><strong>{railroundProfile.public_badge_enabled ? "已启用" : "已关闭"}</strong></div>
+              </div>
+            ) : (
+              <div className="empty"><UserRound /><h3>RailRound 资料尚未发布</h3><p>完成 RailRound 数据库迁移并登记只读视图后，这里会显示专用资料。</p></div>
+            )}
           </section>
         )}
         {tab === "security" && (

@@ -428,6 +428,28 @@ section {
 section > h2:not(:first-child) {
   margin-top: 32px;
 }
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  background: #dfe7e1;
+  border: 1px solid #dfe7e1;
+}
+.profile-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 100px;
+  padding: 18px;
+  background: #fff;
+}
+.profile-grid span {
+  color: #718175;
+  font-size: 12px;
+}
+.profile-grid strong {
+  overflow-wrap: anywhere;
+}
 .inline-form {
   display: flex;
   align-items: flex-end;

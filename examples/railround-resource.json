@@ -1,0 +1,9 @@
+{
+  "id": "railround_profile",
+  "service_id": "railround",
+  "schema_name": "site_railround",
+  "view_name": "profile_public_v1",
+  "user_column": "user_id",
+  "sort_column": "user_id",
+  "columns": ["user_id", "display_name", "tier", "subscription_months", "total_trips", "total_distance_km", "total_lines", "public_badge_enabled", "profile_updated_at"]
+}

@@ -6,6 +6,7 @@
 |---|---|
 | [上机部署](docs/deployment.md) | Ubuntu/Compose 初始化、发布、备份恢复 |
 | [子站接入](docs/integration.md) | SDK、Function、CRUD、签名命令和迁移 |
+| [RailRound 迁移](../PyDesign/RailRound/docs/center-migration.md) | RailRound PostgreSQL 后端、profile 投影和人工切换 |
 | [需求](docs/requirements.md) | 已确认业务和资源约束 |
 | [系统设计](docs/design.md) | 组件选型、身份与服务模型 |
 | [一致性标准](docs/consistency.md) | PostgreSQL 快照、任务等待、幂等与失败恢复 |
