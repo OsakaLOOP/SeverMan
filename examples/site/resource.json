@@ -1,0 +1,9 @@
+{
+  "id": "notes",
+  "service_id": "notes",
+  "schema_name": "site_example",
+  "view_name": "notes_v1",
+  "user_column": "user_id",
+  "sort_column": "id",
+  "columns": ["id", "title", "version", "created_at"]
+}

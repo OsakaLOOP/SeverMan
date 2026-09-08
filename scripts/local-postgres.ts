@@ -56,6 +56,7 @@ export async function startLocalPostgres() {
   let closed = false;
   return {
     admin,
+    adminUrl: url("postgres", adminPassword),
     directory,
     databaseUrl: url("sm_app", appPassword),
     readDatabaseUrl: url("sm_read", readPassword),

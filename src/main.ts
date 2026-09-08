@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
 import { buildApp } from "./app.js";
 import { readConfig } from "./config.js";
+import { readPlatformConfig } from "./platform-config.js";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 
 async function main() {
   const config = readConfig();
-  const app = buildApp(config);
+  const app = buildApp(config, { config: readPlatformConfig() });
   let stopping = false;
   async function stop() {
     if (stopping) return;

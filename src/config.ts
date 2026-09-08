@@ -4,6 +4,7 @@ export interface Config {
   logLevel: string;
   databaseUrl: string;
   readDatabaseUrl: string;
+  trustedProxyCidrs?: string[];
 }
 
 function databaseUrl(value: string | undefined, key: string): string {
@@ -30,5 +31,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     logLevel,
     databaseUrl: databaseUrl(env.DATABASE_URL, "DATABASE_URL"),
     readDatabaseUrl: databaseUrl(env.READ_DATABASE_URL, "READ_DATABASE_URL"),
+    trustedProxyCidrs: env.TRUSTED_PROXY_CIDRS?.split(",").map((value) => value.trim()).filter(Boolean),
   };
 }
