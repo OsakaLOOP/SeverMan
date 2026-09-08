@@ -35,12 +35,13 @@ PostgreSQL 初始 `shared_buffers=128MB`、`work_mem=2MB`、`maintenance_work_me
 | 认证池 | 3 |
 | 中心业务池 | 3 |
 | 中心只读池 | 2 |
-| worker，包括 pg-boss 内部与监听连接 | 5 |
+| core-api 的 pg-boss 提交连接池 | 2 |
+| worker，业务/只读/pg-boss 连接池 | 7 |
 | 6 个业务服务 | 每个 2，共 12 |
 | 迁移、备份和观测 | 4 |
-| 总计 | 29 |
+| 总计 | 33 |
 
-上线核对每个库的真实默认连接数，覆盖 pg-boss 内置 pool、监听连接及发布时的重叠实例。保留 11 个连接用于管理和短期重叠；服务的认证适配器和 ORM 共用已规划的池。EdgeOne Function 通过 HTTPS 调用 Node.js API。
+上线核对真实连接数，覆盖 pg-boss 和发布时的重叠实例。保留 7 个连接用于管理和短期重叠；服务的认证适配器和 ORM 共用已规划的池。EdgeOne Function 通过 HTTPS 调用 Node.js API。
 
 初始连接获取超时 1 秒，闲置连接 30 秒回收，普通 SQL 超时 1 秒、写 SQL 2 秒、锁等待 300 ms、闲置事务 2 秒。迁移和备份采用独立超时。正常池等待 p95 小于 20 ms，单条常规 SQL p95 小于 20 ms，超过 100 ms 的语句单独分析。
 
@@ -70,7 +71,7 @@ PostgreSQL 初始 `shared_buffers=128MB`、`work_mem=2MB`、`maintenance_work_me
 | `openid-client` / `jose` | 复用 discovery 和 JWKS 缓存；并发未知 key 刷新合并并限流；外部请求超时有界 |
 | EdgeOne Function | 只做轻量同源转发/聚合，单次最多 3 个并行后端调用；全部请求 5 秒截止，任务等待至多 2 秒 |
 | EdgeOne 包体 | 项目压缩与打包体积按平台口径测量，目标低于 1 MB；现场验证 Web Crypto、Cookie 和 redirect |
-| PostgreSQL / pg-boss | 使用规划连接池；启动 worker 数量固定；有任务时短轮询、空闲退避，队列 SQL 时间纳入数据库指标 |
+| PostgreSQL / pg-boss | 使用规划连接池，单 worker、并发 2、0.5 秒轮询，恢复检查每 15 秒；队列 SQL 纳入数据库指标 |
 | Nodemailer | `pool=true`、`maxConnections=1`，有界 SMTP 超时；队列负责重试，客户端内部无限重排关闭 |
 | OSS SDK | SDK 仅加载实际厂商；凭据缓存与轮换；签名通常本地完成，远程凭据获取单独测量 |
 | GitHub / SMTP / 支付 | 分别记录连接、首次响应和整体耗时；网络失败有界重试，重复副作用由幂等控制 |

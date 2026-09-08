@@ -15,9 +15,9 @@
 | SQL | Kysely、独立迁移文件 | 显式 SQL 契约；认证表由 Better Auth schema 生成工具管理 |
 | 任务 | `pg-boss` | 复用 PostgreSQL，持久化依赖、有限重试和幂等执行 |
 | 邮件 | Nodemailer + SMTP 服务 | 复用单个 transporter，发送并发 1，后台重试 |
-| OSS | 厂商官方 SDK | 按实际厂商使用 `ali-oss`、`cos-nodejs-sdk-v5` 或 AWS SDK v3，签发直传授权 |
+| OSS | AWS SDK v3 | 首期使用 S3 兼容接口，签发直传授权并通过 HeadObject 确认 |
 | Webhook | 厂商 SDK；自有接口 HMAC-SHA256 | 原始正文验签，事件去重，接收与业务完成分别记录 |
-| 面板 | Vite/React、TanStack Query | 服务目录、会话管理、任务和健康状态 |
+| 面板 | Vite/React、原生 fetch | 服务目录、会话管理、任务、数据和健康状态 |
 | 部署 | Docker Compose v2、Caddy | 独立镜像、资源限制、自动 HTTPS、固定版本 |
 | 观测 | Pino、`perf_hooks`、PostgreSQL 统计 | 日志轮转，记录请求耗时、连接数、队列年龄和资源 |
 | 备份 | `pg_dump` / `pg_restore` + restic | 一致备份后加密异地存储，定期验证恢复 |
@@ -43,7 +43,7 @@ PostgreSQL 已满足独立身份平台的数据库前提，嵌入式方案仍因
 | 评论、RSS、状态服务 | 按原有职责独立发布 | 自有 schema 或只读账号 |
 | PostgreSQL、Caddy | 数据存储与网络入口 | 独立基础设施权限 |
 
-中心的账号管理、服务目录和聚合是同一 API 中的模块。管理面板负责配置接入、查看状态、重试任务；部署和进程重启由 CI/SSH 运维身份执行，面板容器使用应用权限。
+中心的账号管理、服务目录和聚合是同一 API 中的模块。管理面板负责服务接入、状态和任务查询；自动重试由 worker 管理，终态失败使用新幂等键提交新操作。部署与重启由 CI/SSH 运维身份执行。
 
 ```mermaid
 flowchart LR
@@ -78,19 +78,19 @@ flowchart LR
 
 站点采用授权码 + S256 PKCE，验证 `state`、`nonce`、issuer 和回调。BFF 使用 `openid-client` 完成令牌兑换，并建立本站会话。中心和各站分别使用 `HttpOnly`、`Secure`、host-only Cookie；普通顶层跳转采用 `SameSite=Lax`，修改请求执行 Origin/CSRF 校验。refresh token 加密存储于服务端。
 
-跨独立域名采用相同登录协议。React SDK 提供登录、用户状态与退出，认证页使用顶层跳转或弹窗；弹窗回传验证精确 origin 和一次性状态。Function 转发同源 BFF 请求，保留多个 `Set-Cookie`，认证响应设置 `Cache-Control: no-store`。数据库连接和账号逻辑留在 Node.js 服务。
+跨独立域名采用相同登录协议。React SDK 提供登录、用户状态与退出，认证页使用顶层跳转。Function 转发同源 BFF 请求，保留多个 `Set-Cookie`，认证响应设置 `Cache-Control: no-store`。数据库连接和账号逻辑留在 Node.js 服务。
 
 普通用户自选二次验证，admin 使用二次验证与恢复码。公开注册启用邮件验证、限流和恢复；登录邮件进入高优先级任务队列。
 
 ### 会话与撤销标准
 
-会话建议 7 天闲置有效期、30 天绝对有效期，绝对期限由集成层实施；API access token 有效期 5 分钟。BFF 每次验证本站会话，对中心授权状态最多缓存 30 秒；敏感修改在线核对。中心撤销后，普通受保护请求在 60 秒内停止授权。
+中心和 BFF 会话采用固定 7 天有效期；中心关闭自动续期，集成层额外保留 30 天上限校验。API access token 有效期 5 分钟。BFF 验证本站会话，对中心授权状态最多缓存 30 秒；敏感修改可强制在线核对。中心撤销后，普通受保护请求在 60 秒内停止授权。
 
-启用 Back-Channel Logout，站点按 `sid` 撤销会话；周期性状态核对覆盖通知未送达。全站退出同时处理 refresh token 和 `offline_access` 授权，按照库的实际行为验收 [C02]。中心不可用时，授权缓存到期后的受保护请求返回暂时不可用；公共静态内容继续服务。
+BFF 提供 Back-Channel Logout 验签接收端，首期登记客户端依赖周期性 userinfo 核对完成撤销。全站退出删除 refresh token 并撤销中心会话，已通过真实 BFF 测试 [C02]。中心不可用时，缓存到期后的受保护请求返回暂时不可用；公共静态内容继续服务。
 
 ## 签名与外部服务
 
-`jose` 校验令牌声明和签名，JWKS 缓存在进程内，未知 `kid` 才触发有界刷新。算法优先 RS256，实际 EdgeOne 项目需完成验签兼容测试。服务调用使用受限 audience 的 client credentials token，用户业务调用同时保留经过验证的用户授权上下文。
+`jose` 校验令牌声明和签名，JWKS 缓存在进程内，未知 `kid` 触发有界刷新。采用 RS256。首期自有服务命令使用每目标独立的 HMAC-SHA256 密钥和命令权限清单，用户 ID 由中心会话确定；扩展第三方机器授权时增设 audience/scope 受限的 client credentials。
 
 OSS 授权初始有效期 5 分钟，约束对象 key、操作和前缀。支持大小范围的策略限定上传大小，其他方式在确认阶段核对对象元信息。上传完成状态由 OSS 元信息或已验签回调确认。图片 CORS 配置精确来源和方法，字节流由 OSS/CDN 传输。
 
@@ -98,7 +98,7 @@ OSS 授权初始有效期 5 分钟，约束对象 key、操作和前缀。支持
 
 ## 服务模型与 API
 
-服务登记 `service_id`、公开域名、API 地址、OAuth client、回调、scope、允许命令、视图版本、健康端点和接入状态。生产与预览环境使用不同 client 和凭据。admin 管理服务配置，读取用户私有内容的权限独立约束。
+服务登记 `service_id`、名称、公开域名、OAuth client、回调、scope 和接入状态。允许命令与远端地址通过环境配置，版本视图通过迁移 CLI 登记。生产与预览环境使用不同 client 和凭据，用户私有内容按会话归属过滤。
 
 API 使用 `/v1`、JSON、统一错误码、请求 ID 与 RFC 3339 时间。分页默认 20 条、最多 100 条，普通列表采用稳定 cursor；管理列表按需要提供页码和显式总数。高风险写入和异步提交支持 `Idempotency-Key`；操作状态接口检查发起用户与服务权限。
 

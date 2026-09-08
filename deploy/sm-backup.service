@@ -1,0 +1,14 @@
+[Unit]
+Description=SM PostgreSQL 异地备份
+
+[Service]
+Type=oneshot
+User=sm-backup
+EnvironmentFile=/etc/sm/backup.env
+ExecStart=/opt/sm/deploy/backup.sh
+Nice=10
+CPUQuota=25%
+MemoryMax=256M
+TimeoutStartSec=25min
+NoNewPrivileges=true
+PrivateTmp=true

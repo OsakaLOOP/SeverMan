@@ -1,0 +1,135 @@
+name: sm
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:18-bookworm}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请配置数据库管理密码}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks: [database]
+    mem_limit: 768m
+    cpus: 1.5
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "work_mem=2MB", "-c", "max_connections=40"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sm"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    stop_grace_period: 30s
+  core:
+    image: ${SM_IMAGE:-sm-center:local}
+    build: ..
+    restart: unless-stopped
+    environment: &runtime_environment
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      TRUSTED_PROXY_CIDRS: 172.30.0.2/32
+      DATABASE_URL: ${DATABASE_URL:?请配置运行数据库地址}
+      READ_DATABASE_URL: ${READ_DATABASE_URL:?请配置只读数据库地址}
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:?请配置认证数据库地址}
+      QUEUE_DATABASE_URL: ${QUEUE_DATABASE_URL:?请配置队列数据库地址}
+      AUTH_ORIGIN: ${AUTH_ORIGIN:?请配置登录来源}
+      AUTH_SECRET: ${AUTH_SECRET:?请配置认证密钥}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_IDS: ${STRIPE_PRICE_IDS:-}
+      WEBHOOK_TARGETS_JSON: ${WEBHOOK_TARGETS_JSON:-}
+    networks: [database, ingress]
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 512m
+    cpus: 1.5
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    stop_grace_period: 20s
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '3' }
+  worker:
+    image: ${SM_IMAGE:-sm-center:local}
+    restart: unless-stopped
+    environment:
+      <<: *runtime_environment
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=128
+    command: ["node", "dist/worker.js"]
+    networks: [database, ingress]
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 256m
+    cpus: 0.5
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    stop_grace_period: 25s
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '3' }
+  migrate:
+    profiles: [tools]
+    image: sm-center-tools:local
+    build:
+      context: ..
+      target: tools
+    environment:
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:-}
+      READ_DATABASE_PASSWORD: ${READ_DATABASE_PASSWORD:-}
+    networks: [database]
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 512m
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      AUTH_DOMAIN: ${AUTH_DOMAIN:?请配置登录域名}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      ingress:
+        ipv4_address: 172.30.0.2
+    mem_limit: 128m
+    depends_on: [core]
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '3' }
+networks:
+  database:
+    name: sm_database
+    internal: true
+  ingress:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

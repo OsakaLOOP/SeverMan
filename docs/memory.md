@@ -8,3 +8,6 @@
 - 官方资料暂存于 `.research/`，该目录忽略提交；引用记录在 `sources.md`，章节索引在 `docs/references/`。
 - 第一阶段服务入口为 `src/main.ts`，应用工厂为 `src/app.ts`。`npm run dev:local` 自动准备独立本地 PostgreSQL，正式配置入口为 `.env.example`。
 - 本机没有 Docker 或预装 PostgreSQL；集成测试通过开发依赖 `embedded-postgres` 执行真实 SQL。生产使用标准 PostgreSQL 容器。
+- 面板为 `web/`，SDK 为 `sdk/`，笔记样板为 `examples/site/`。上机步骤见 `docs/deployment.md`，跨站对接见 `docs/integration.md`。
+- 本地完整预览：先 build，`SM_DEMO=1`、`PORT=3001` 后执行 `npm run dev:local`，随机账号位于 `.local/dev-account.json`；每次启动独立数据库。
+- 身份会话固定 7 天，BFF 的 userinfo 校验缓存最长 30 秒。`sdk/commands.ts` 将幂等结果和子站业务变更在同一事务提交。
