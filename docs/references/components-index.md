@@ -2,6 +2,20 @@
 
 核对日期：2026-09-08。记录本轮读取页面的全部章节标题；原始页面和正文暂存在 `.research/`。
 
+## 开发 PostgreSQL
+
+来源：<https://github.com/leinelissen/embedded-postgres>
+
+  - [Installation](https://github.com/leinelissen/embedded-postgres)
+  - [Usage](https://github.com/leinelissen/embedded-postgres)
+  - [PostgresQL Versions](https://github.com/leinelissen/embedded-postgres)
+  - [API](https://github.com/leinelissen/embedded-postgres)
+  - [Contributing](https://github.com/leinelissen/embedded-postgres)
+    - Development
+  - [Troubleshotting](https://github.com/leinelissen/embedded-postgres)
+    - Running in Docker containers
+  - [Credits and Licensing](https://github.com/leinelissen/embedded-postgres)
+
 ## PostgreSQL 事务隔离
 
 来源：<https://www.postgresql.org/docs/current/transaction-iso.html>

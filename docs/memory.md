@@ -6,3 +6,5 @@
 - 用户确认内部账号统一、外部身份关联、公开注册、单一 admin、无团队协作，各站通过 SDK 可嵌入登录组件。
 - 用户要求分阶段开发，独立修改分别提交。开发进展统一记录于 `docs/implementation.md`。
 - 官方资料暂存于 `.research/`，该目录忽略提交；引用记录在 `sources.md`，章节索引在 `docs/references/`。
+- 第一阶段服务入口为 `src/main.ts`，应用工厂为 `src/app.ts`。`npm run dev:local` 自动准备独立本地 PostgreSQL，正式配置入口为 `.env.example`。
+- 本机没有 Docker 或预装 PostgreSQL；集成测试通过开发依赖 `embedded-postgres` 执行真实 SQL。生产使用标准 PostgreSQL 容器。

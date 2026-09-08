@@ -24,6 +24,7 @@
 | C16 | [PostgreSQL 隔离](https://www.postgresql.org/docs/current/transaction-iso.html) | READ COMMITTED、REPEATABLE READ、冲突重试 |
 | C17 | [pg-boss](https://github.com/timgit/pg-boss) | PostgreSQL 任务、事务提交、依赖和重试 |
 | C18 | [node-postgres 连接池](https://node-postgres.com/guides/pool-sizing) | 多进程连接总量与管理余量 |
+| C19 | [embedded-postgres](https://github.com/leinelissen/embedded-postgres) | 仅用于开发的 PostgreSQL 二进制管理、初始化、启动和停止；核对安装包 README |
 
 本轮所读页面的完整章节索引见 [组件文档索引](docs/references/components-index.md)。官方 README 使用 GitHub 原始地址或 jsDelivr 镜像暂存，引用指向官方仓库。技术实施仅继续读取直接相关的接口文档。
 

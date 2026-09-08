@@ -8,11 +8,15 @@
 
 ## 阶段 1：服务与数据库基础
 
-状态：进行中。
+状态：已完成代码与本地验收。
 
 建立 TypeScript/Fastify 项目、配置校验、结构化日志、健康检查、PostgreSQL 连接池、迁移与 schema/角色隔离。提供一致快照读取模块、开发启动方式、容器配置和真实 PostgreSQL 集成测试。
 
 验收：可启动和正常关闭；依赖中断时返回未就绪；迁移可重复执行并检测内容变更；只读角色无法写入；同一事务跨查询保持快照一致。
+
+本地验证：Node.js 24.11.1，开发 PostgreSQL 18 包；6 项集成测试、类型检查与生产构建通过。已提供 Dockerfile 和开发数据库 Compose；本机没有 Docker，容器运行与目标 Ubuntu 性能测试归入部署验收。
+
+代码入口：`src/app.ts`、`src/config.ts`、`src/db/`；迁移在 `migrations/`，初始化及本地运行脚本在 `scripts/`，集成测试在 `tests/foundation.test.ts`。
 
 ## 阶段 2：身份与服务注册
 
