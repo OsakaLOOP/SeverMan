@@ -56,7 +56,7 @@ export function buildApp(config: Config, platform?: PlatformOptions) {
   });
   if (platform) {
     app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
-    app.register(async (scope) => { await registerPlatform(scope, database, platform); });
+    app.register(async (scope) => { await registerPlatform(scope, database, { ...platform, baseConfig: config }); });
     const root = resolve("web/dist");
     if (existsSync(root)) {
       app.register(serveStatic, { root, prefix: "/" });

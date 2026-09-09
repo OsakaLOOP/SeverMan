@@ -8,6 +8,8 @@ import { readConfig } from "../src/config.js";
 import { migrate } from "../src/db/migrations.js";
 import { withReadSnapshot } from "../src/db/snapshot.js";
 import { startLocalPostgres } from "../scripts/local-postgres.js";
+import type { PlatformConfig } from "../src/platform-config.js";
+import { RuntimeConfig, documentFromConfig } from "../src/runtime-config.js";
 
 let local: Awaited<ReturnType<typeof startLocalPostgres>>;
 let reader: Pool;
@@ -39,7 +41,7 @@ test("迁移与健康检查：未迁移返回 503，迁移后返回 200，重复
     assert.equal((await app.inject("/health/live")).statusCode, 200);
     assert.equal((await app.inject("/health/ready")).statusCode, 503);
     const applied = await Promise.all([migrate(local.admin), migrate(local.admin)]);
-    assert.equal(applied.flat().length, 4);
+    assert.equal(applied.flat().length, 5);
     assert.equal(applied.flat()[0], "001_services.sql");
     assert.deepEqual(await migrate(local.admin), []);
     const ready = await app.inject("/health/ready");
@@ -55,8 +57,8 @@ test("已应用的迁移变化会拒绝继续，迁移失败不会保留部分�
   await writeFile(resolve(directory, "001_services.sql"), first + "\n-- 修改校验\n", "utf8");
   await assert.rejects(migrate(local.admin, directory), /内容变化/);
   await writeFile(resolve(directory, "001_services.sql"), first, "utf8");
-  for (const file of ["002_platform.sql", "003_auth.sql", "004_afdian.sql"]) await writeFile(resolve(directory, file), await readFile(resolve("migrations", file), "utf8"), "utf8");
-  await writeFile(resolve(directory, "005_invalid.sql"), "CREATE TABLE core.should_rollback (id integer); SELECT no_such_column;", "utf8");
+  for (const file of ["002_platform.sql", "003_auth.sql", "004_afdian.sql", "005_runtime_config.sql"]) await writeFile(resolve(directory, file), await readFile(resolve("migrations", file), "utf8"), "utf8");
+  await writeFile(resolve(directory, "006_invalid.sql"), "CREATE TABLE core.should_rollback (id integer); SELECT no_such_column;", "utf8");
   await assert.rejects(migrate(local.admin, directory));
   const result = await local.admin.query("SELECT to_regclass('core.should_rollback') AS name");
   assert.equal(result.rows[0].name, null);
@@ -109,4 +111,21 @@ test("数据库不可用时存活检查有效，就绪检查返回 503 且错误
     assert.doesNotMatch(result.body, /secret|password|postgresql/);
     assert.equal((await app.inject("/v1/services")).statusCode, 404);
   } finally { await app.close(); }
+});
+
+test("统一配置模板校验、版本锁、脱敏和热更新边界", async () => {
+  const platform: PlatformConfig = { origin: "http://127.0.0.1:3000", secret: "config-test-secret-with-32-characters", authDatabaseUrl: local.databaseUrl, queueDatabaseUrl: local.databaseUrl, requireVerification: true, webhookTargets: {} };
+  const base = { host: "127.0.0.1", port: 3000, logLevel: "info", databaseUrl: local.databaseUrl, readDatabaseUrl: local.readDatabaseUrl };
+  const runtime = new RuntimeConfig(local.admin, base, platform);
+  await runtime.load();
+  const document = documentFromConfig(base, platform);
+  document.integrations.webhook_targets = { site: { url: "https://site.example.com/hooks", secret: "webhook-secret-with-32-characters-long", commands: { "notes.create": "user" } } };
+  const preview = await runtime.validate(document);
+  assert.equal(preview.valid, true); assert.ok(preview.applied_hot.some((path) => path.startsWith("integrations.webhook_targets.site")));
+  const applied = await runtime.update(document, 0, "alice", "test");
+  assert.equal(applied.version, 1); assert.ok(applied.applied_hot.length > 0); assert.deepEqual(runtime.getDocument().database.database_url, "***");
+  assert.equal(runtime.getDocument().integrations.webhook_targets.site!.secret, "***");
+  await assert.rejects(runtime.update({ ...document, auth: { ...document.auth, secret: "another-secret-with-32-characters" } }, 1, "alice", "test"), { code: "CONFIG_SECRET_ROTATION_REQUIRES_ENV" });
+  await assert.rejects(runtime.update(document, 0, "alice", "test"), { code: "CONFIG_VERSION_CONFLICT" });
+  const template = runtime.template(); assert.equal(template.auth.secret, ""); assert.equal(template.database.database_url, "");
 });

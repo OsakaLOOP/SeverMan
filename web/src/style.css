@@ -519,6 +519,14 @@ section > h2:not(:first-child) {
 .billing-pagination button { width: 40px; height: 40px; padding: 0; justify-content: center; }
 .billing-panel table { min-width: 680px; }
 .billing-panel th, .billing-panel td:not(:first-child) { white-space: nowrap; }
+.config-panel { margin-top: 42px; border-top: 1px solid #dfe7e1; padding-top: 22px; }
+.config-actions { align-items: center; }
+.file-button { position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; border: 1px solid #bfd0c4; border-radius: 5px; color: #275c47; background: #fff; cursor: pointer; }
+.file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; min-height: 100%; }
+.config-editor { display: flex; flex-direction: column; gap: 8px; margin: 18px 0; }
+.config-editor textarea { min-height: 440px; width: 100%; resize: vertical; font: 12px/1.6 Consolas, monospace; }
+.config-result { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin: 14px 0; padding: 12px; background: #edf6ef; border: 1px solid #cde2d3; color: #36704c; }
+.config-result strong { display: inline-flex; align-items: center; gap: 6px; }
 .upload {
   border: 1px dashed #b7cabe;
   padding: 20px;

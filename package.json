@@ -21,6 +21,7 @@
     "example:site": "tsx examples/site/server.ts",
     "test:browser": "tsx scripts/browser-check.ts",
     "test:billing-browser": "tsx scripts/billing-browser-check.ts",
+    "config:validate": "tsx scripts/config-validate.ts",
     "db:provision": "tsx scripts/provision-cli.ts",
     "check": "npm run typecheck && npm test && npm run build"
   },

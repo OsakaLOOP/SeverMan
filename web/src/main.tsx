@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import "./style.css";
 import { BillingPanel } from "./billing.js";
+import { ConfigPanel } from "./config-panel.js";
 
 const auth = createAuthClient({
   plugins: [twoFactorClient(), oauthProviderClient()],
@@ -1070,6 +1071,7 @@ function App() {
               </button>
             </div>
             {result !== null && <pre>{JSON.stringify(result, null, 2)}</pre>}
+            {me.admin_ready && <ConfigPanel request={api} />}
           </section>
         )}
         <footer>

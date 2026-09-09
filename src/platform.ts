@@ -11,9 +11,12 @@ import { readResources } from "./resources.js";
 import { registerStorage } from "./storage.js";
 import { registerBilling } from "./billing.js";
 import { registerAfdian } from "./afdian-routes.js";
+import { RuntimeConfig, documentFromConfig, type UnifiedConfigDocument } from "./runtime-config.js";
+import type { Config } from "./config.js";
 
 export interface PlatformOptions {
   config: PlatformConfig;
+  baseConfig?: Config;
   worker?: boolean;
   captureMail?: (mail: { to: string; subject: string; text: string }) => void;
   requireAdminTwoFactor?: boolean;
@@ -21,12 +24,18 @@ export interface PlatformOptions {
 
 export async function registerPlatform(app: FastifyInstance, database: DatabaseResources, options: PlatformOptions) {
   const config = options.config;
+  const baseConfig = options.baseConfig ?? { host: "127.0.0.1", port: Number(new URL(config.origin).port || 3000), logLevel: "info", databaseUrl: config.authDatabaseUrl, readDatabaseUrl: config.authDatabaseUrl };
+  const runtime = new RuntimeConfig(database.primary, baseConfig, config);
+  await runtime.load();
   const authPool = new Pool({ connectionString: config.authDatabaseUrl, max: 3, options: "-c search_path=auth", connectionTimeoutMillis: 1000 });
   authPool.on("error", () => app.log.error("认证数据库连接错误"));
   const jobs = new Jobs(database.primary, database.reader, config, options.captureMail);
   const auth = createAuth(config, authPool, (to, subject, text) => jobs.mail(to, subject, text), async (id) => Boolean((await database.primary.query('SELECT 1 FROM core.admin_account a JOIN auth."user" u ON u.id::text=a.user_id WHERE a.user_id=$1 AND ($2 OR u."twoFactorEnabled"=true)', [id, options.requireAdminTwoFactor === false])).rowCount));
   app.addHook("onClose", async () => { await jobs.stop(); await authPool.end(); });
   await jobs.start(options.worker ?? false);
+  const configPoll = setInterval(() => { void runtime.sync().catch(() => app.log.warn("配置热更新同步失败")); }, 2000);
+  configPoll.unref();
+  app.addHook("onClose", async () => { clearInterval(configPoll); });
 
   async function session(request: FastifyRequest) {
     const result = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
@@ -57,6 +66,31 @@ export async function registerPlatform(app: FastifyInstance, database: DatabaseR
       return { user: current, admin: isAdmin, admin_ready: isAdmin && (options.requireAdminTwoFactor === false || Boolean(current.twoFactorEnabled)) };
     });
     api.get("/v1/config", async () => ({ github: Boolean(config.github), mail: Boolean(config.smtp || options.captureMail), storage: Boolean(config.storage), billing: Boolean(config.afdian || config.stripe), afdian: Boolean(config.afdian), afdian_oauth: Boolean(config.afdian?.oauth), prices: config.stripe?.prices ?? [] }));
+    api.get("/v1/admin/config", async (request) => {
+      await admin(request);
+      return { version: runtime.getVersion(), applied_version: runtime.getAppliedVersion(), restart_required: runtime.getRestartRequired(), document: runtime.getDocument(), template: runtime.template() };
+    });
+    api.post<{ Body: { document: UnifiedConfigDocument; if_version?: number; source?: string } }>("/v1/admin/config/validate", async (request) => {
+      await admin(request);
+      return runtime.validate(request.body.document);
+    });
+    api.put<{ Body: { document: UnifiedConfigDocument; if_version?: number; source?: string } }>("/v1/admin/config", async (request) => {
+      const current = await admin(request);
+      return runtime.update(request.body.document, request.body.if_version, current.id, request.body.source ?? "panel");
+    });
+    api.post<{ Body: { document: UnifiedConfigDocument; if_version?: number } }>("/v1/admin/config/upload", async (request) => {
+      const current = await admin(request);
+      return runtime.update(request.body.document, request.body.if_version, current.id, "upload");
+    });
+    api.patch<{ Body: { patch: Record<string, unknown>; if_version?: number; source?: string } }>("/v1/admin/config", async (request) => {
+      const current = await admin(request);
+      const merged = JSON.parse(JSON.stringify(runtime.getDocument(false))) as Record<string, unknown>;
+      const merge = (target: Record<string, unknown>, patch: Record<string, unknown>) => { for (const [key, value] of Object.entries(patch)) { if (value && typeof value === "object" && !Array.isArray(value) && target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) merge(target[key] as Record<string, unknown>, value as Record<string, unknown>); else target[key] = value; } };
+      merge(merged, request.body.patch);
+      return runtime.update(merged, request.body.if_version, current.id, request.body.source ?? "panel");
+    });
+    api.get("/v1/admin/config/audit", async (request) => { await admin(request); return { items: (await database.primary.query("SELECT version,actor_id,source,changed_paths,restart_required,created_at FROM core.config_audit ORDER BY id DESC LIMIT 100")).rows }; });
+    api.get("/v1/admin/config/status", async (request) => { await admin(request); return { version: runtime.getVersion(), applied_version: runtime.getAppliedVersion(), restart_required: runtime.getRestartRequired() }; });
     api.get("/v1/services", async (request) => {
       await user(request);
       return { items: (await database.primary.query("SELECT id,display_name,origin,state,version FROM core.services WHERE state='active' ORDER BY id")).rows };

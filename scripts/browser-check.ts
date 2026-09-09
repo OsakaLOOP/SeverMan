@@ -21,6 +21,11 @@ try {
       await page.getByRole("navigation").getByRole("button", { name: tab, exact: true }).click();
       await page.getByRole("heading", { level: 1, name: tab, exact: true }).waitFor();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, `${tab} 页面横向溢出`);
+      if (tab === "管理") {
+        await page.getByRole("heading", { name: "统一配置", exact: true }).waitFor();
+        await page.getByRole("textbox", { name: "配置 JSON" }).waitFor();
+        await page.screenshot({ path: `.local/screenshots/config-${viewport.width}.png`, fullPage: true });
+      }
     }
     await page.getByRole("button", { name: "注册服务", exact: true }).click();
     await page.getByRole("dialog").waitFor();
