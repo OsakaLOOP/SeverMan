@@ -57,7 +57,9 @@ npm run resource:register -- examples/site/resource.json
 
 配置 S3 兼容存储的 `S3_*`。`POST /v1/uploads` 返回 5 分钟有效的 PUT URL，直传后调用 `/v1/uploads/:id/confirm` 核对所有者、类型和大小。Bucket CORS 允许实际来源的 PUT/HEAD 和 Content-Type；图片通过 CDN/图片服务分发。配置未完成上传的生命周期清理。
 
-Stripe 使用 `STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、`STRIPE_PRICE_IDS`；Webhook 地址 `/v1/billing/webhook`。Checkout 使用幂等键，订阅事件验签后写库并去重。正式开放前核对商户地区、价格、退款和取消渠道。
+爱发电为主支付渠道，配置 `AFDIAN_USER_ID`、`AFDIAN_TOKEN` 和 `AFDIAN_PLANS_JSON`；Webhook 地址 `/v1/billing/afdian/webhook`。付款关联、OAuth2、API 同步、异步核销及子站只读权益见 [支付接入](billing.md)。子站可使用 `sdk/entitlements.ts` 在业务事务中读取有效权益，页面按用户本人权限展示订单。
+
+可选 Stripe 接口使用 `STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、`STRIPE_PRICE_IDS`，通知地址为 `/v1/billing/webhook`。
 
 ## 原有站点迁移
 

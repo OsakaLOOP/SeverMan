@@ -1,5 +1,10 @@
 # 项目记录
 
+- 2026-09-09：支付以爱发电为主，用户确认不存在 KV 支付记录，支付按空数据开发，取消旧支付导入与兼容路线。
+- 爱发电文档入口为 `docs/billing.md`；协议客户端在 `src/afdian-client.ts`，订单及任务在 `src/afdian.ts`，接口在 `src/afdian-routes.ts`，面板在 `web/src/billing.tsx`，子站权益查询在 `sdk/entitlements.ts`。
+- 用户提供的两个 ifdian.net `/p/` 链接是开发文档。官方文档可通过网站公开的 `/api/post/get-detail?post_id=...` 获取内容，暂存 `.research/afdian-*.txt`；源码只使用文档确认的 Open API。
+- 爱发电 webhook 签名覆盖订单号、用户 ID、套餐 ID、金额四项。核销先调用商户 API 验证完整订单，订阅有效期读取 sponsor 的 `expire_time`。OAuth2 负责外部账号关联。
+
 - 根目录入口为 `README.md`，系统设计见 `docs/design.md`，性能标准见 `docs/operations.md`。
 - 用户于 2026-09-08 确认 PostgreSQL，按服务 schema 和角色隔离，跨站读取使用同库快照。
 - `docs/requirements.md` 中资源规格为 2V4G3M，采用该配置制定预算；初次讨论的 4 核规格提供额外 CPU 余量。

@@ -14,6 +14,8 @@ chmod 600 .env
 
 公开邮箱注册配置 `SMTP_HOST/PORT/USER/PASSWORD/FROM/SECURE`。GitHub OAuth App 回调为 `https://auth.example.com/api/auth/callback/github`。外部密钥按 `.env.example` 填入；未配置的 OSS 和支付接口返回 503，面板显示未开放状态。
 
+爱发电商户与套餐配置、Webhook/OAuth2 地址、同步及订单核销验收见 [支付部署](billing.md#部署配置)。core 和 worker 使用相同 `AFDIAN_*` 配置，首次发布先应用 `004_afdian.sql` 迁移。
+
 Compose 入口网络为 `172.30.0.0/24`，Caddy 地址 `172.30.0.2`，源站仅信任该代理。已有网段冲突时，同时修改 Compose 的网段、Caddy 地址与 `TRUSTED_PROXY_CIDRS`。
 
 ## 首次启动

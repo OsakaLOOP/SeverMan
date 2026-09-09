@@ -1,5 +1,15 @@
 # 参考来源
 
+## 爱发电支付
+
+| 编号 | 官方来源 | 核对内容 |
+|---|---|---|
+| A01 | [开发者功能汇总](https://ifdian.net/p/010ff078177211eca44f52540025c377) | 付款 URL、custom_order_id、month、OAuth2 申请和嵌入 |
+| A02 | [Webhook 与 API 文档](https://ifdian.net/p/9c65d9cc617011ed81c352540025c377) | RSA-SHA256 通知签名、MD5 Open API 签名、订单分页、赞助者期限、OAuth2、query-plan |
+| A03 | [开发者后台](https://ifdian.net/dashboard/dev) | 官方文章给出的商户配置入口，商户凭据由部署者填写 |
+
+两篇用户指定文章于 2026-09-09 通过网站公开文章接口读取全文，完整章节索引见 [爱发电文档索引](docs/references/afdian-index.md)。`guide.ifdian.net` 旧文档入口当日 DNS 无法解析。A02 的 `send-msg` 限速属于私信接口；本项目 Open API 每秒最多四次的串行请求是项目资源标准。
+
 本设计的选型依据和协议入口如下。组件资料于 2026-09-08 核对，性能预算是项目验收标准，与厂商实测数据分别记录。
 
 ## 组件与运行标准
