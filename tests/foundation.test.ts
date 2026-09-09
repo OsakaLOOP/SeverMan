@@ -39,7 +39,7 @@ test("迁移与健康检查：未迁移返回 503，迁移后返回 200，重复
     assert.equal((await app.inject("/health/live")).statusCode, 200);
     assert.equal((await app.inject("/health/ready")).statusCode, 503);
     const applied = await Promise.all([migrate(local.admin), migrate(local.admin)]);
-    assert.equal(applied.flat().length, 3);
+    assert.equal(applied.flat().length, 4);
     assert.equal(applied.flat()[0], "001_services.sql");
     assert.deepEqual(await migrate(local.admin), []);
     const ready = await app.inject("/health/ready");
@@ -55,8 +55,8 @@ test("已应用的迁移变化会拒绝继续，迁移失败不会保留部分�
   await writeFile(resolve(directory, "001_services.sql"), first + "\n-- 修改校验\n", "utf8");
   await assert.rejects(migrate(local.admin, directory), /内容变化/);
   await writeFile(resolve(directory, "001_services.sql"), first, "utf8");
-  for (const file of ["002_platform.sql", "003_auth.sql"]) await writeFile(resolve(directory, file), await readFile(resolve("migrations", file), "utf8"), "utf8");
-  await writeFile(resolve(directory, "004_invalid.sql"), "CREATE TABLE core.should_rollback (id integer); SELECT no_such_column;", "utf8");
+  for (const file of ["002_platform.sql", "003_auth.sql", "004_afdian.sql"]) await writeFile(resolve(directory, file), await readFile(resolve("migrations", file), "utf8"), "utf8");
+  await writeFile(resolve(directory, "005_invalid.sql"), "CREATE TABLE core.should_rollback (id integer); SELECT no_such_column;", "utf8");
   await assert.rejects(migrate(local.admin, directory));
   const result = await local.admin.query("SELECT to_regclass('core.should_rollback') AS name");
   assert.equal(result.rows[0].name, null);

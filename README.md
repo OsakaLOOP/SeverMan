@@ -6,6 +6,7 @@
 |---|---|
 | [上机部署](docs/deployment.md) | Ubuntu/Compose 初始化、发布、备份恢复 |
 | [子站接入](docs/integration.md) | SDK、Function、CRUD、签名命令和迁移 |
+| [爱发电支付](docs/billing.md) | 套餐同步、Webhook、订单核销、订阅权益和联调 |
 | [RailRound 迁移](../PyDesign/RailRound/docs/center-migration.md) | RailRound PostgreSQL 后端、profile 投影和人工切换 |
 | [需求](docs/requirements.md) | 已确认业务和资源约束 |
 | [系统设计](docs/design.md) | 组件选型、身份与服务模型 |
@@ -35,7 +36,7 @@ npm run dev:local
 
 修改面板后执行 `npm run build` 并刷新；修改服务器代码后重启 `dev:local`。需要保留业务数据时使用外部 PostgreSQL。
 
-已实现统一身份/OIDC、邮箱验证、GitHub 关联、TOTP/恢复码、服务注册、跨站查询、任务与签名命令、OSS 直传、Stripe 订阅接口及管理面板。存活检查为 `/health/live`，就绪检查为 `/health/ready`。
+已实现统一身份/OIDC、邮箱验证、GitHub 关联、TOTP/恢复码、服务注册、跨站查询、任务与签名命令、OSS 直传、爱发电支付订阅、可选 Stripe 接口及管理面板。存活检查为 `/health/live`，就绪检查为 `/health/ready`。
 
 ## 外部数据库
 

@@ -25,6 +25,7 @@ import {
   UserRound,
 } from "lucide-react";
 import "./style.css";
+import { BillingPanel } from "./billing.js";
 
 const auth = createAuthClient({
   plugins: [twoFactorClient(), oauthProviderClient()],
@@ -57,6 +58,8 @@ type SettingsType = {
   storage: boolean;
   mail: boolean;
   billing: boolean;
+  afdian?: boolean;
+  afdian_oauth?: boolean;
   prices: string[];
 };
 const messages: Record<string, string> = {
@@ -69,6 +72,14 @@ const messages: Record<string, string> = {
   BILLING_UNAVAILABLE: "支付服务尚未配置",
   SERVICE_EXISTS: "服务标识已存在",
   ORIGIN_REJECTED: "请求来源未授权",
+  AFDIAN_PLAN_UNAVAILABLE: "套餐正在同步，请稍后重试",
+  AFDIAN_ACCOUNT_REQUIRED: "请先关联爱发电账号，或使用订单号核销",
+  AFDIAN_ACCOUNT_CONFLICT: "爱发电账号已关联其他用户",
+  AFDIAN_ORDER_NOT_FOUND: "未找到属于当前账号的订单",
+  AFDIAN_CHECKOUT_EXPIRED: "付款链接已使用或到期，请重新选择套餐",
+  AFDIAN_INVALID_MONTHS: "订阅时长与套餐周期不一致",
+  AFDIAN_OAUTH_UNAVAILABLE: "账号关联尚未开放",
+  AFDIAN_API_UNAVAILABLE: "爱发电暂时无法连接，请稍后重试",
 };
 async function api<T>(
   path: string,
@@ -119,7 +130,7 @@ function App() {
     billing: false,
     prices: [],
   });
-  const [tab, setTab] = useState("services");
+  const [tab, setTab] = useState(new URLSearchParams(location.search).has("billing") ? "billing" : "services");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -994,7 +1005,8 @@ function App() {
             </button>
           </section>
         )}
-        {tab === "billing" && (
+        {tab === "billing" && settings.afdian && <BillingPanel request={api} oauth={Boolean(settings.afdian_oauth)} admin={me.admin_ready} userId={me.user.id} />}
+        {tab === "billing" && !settings.afdian && (
           <section>
             <h2>订阅状态</h2>
             <p className="muted">

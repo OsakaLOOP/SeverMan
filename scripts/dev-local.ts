@@ -4,6 +4,7 @@ import { startLocalPostgres } from "./local-postgres.js";
 import { migrateQueue } from "./queue-migrate.js";
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
+import { readPlatformConfig } from "../src/platform-config.js";
 
 const database = await startLocalPostgres();
 const port = Number(process.env.PORT ?? "3001");
@@ -16,7 +17,7 @@ const app = buildApp({
   logLevel: "info",
   databaseUrl: database.databaseUrl,
   readDatabaseUrl: database.readDatabaseUrl,
-}, { config: { origin, secret, authDatabaseUrl: database.databaseUrl, queueDatabaseUrl: database.databaseUrl, requireVerification: true, webhookTargets: {} }, worker: true, requireAdminTwoFactor: false, captureMail: (mail) => outbox.push(mail) });
+}, { config: readPlatformConfig({ ...process.env, AUTH_ORIGIN: origin, AUTH_SECRET: secret, AUTH_DATABASE_URL: database.databaseUrl, QUEUE_DATABASE_URL: database.databaseUrl }), worker: true, requireAdminTwoFactor: false, captureMail: (mail) => outbox.push(mail) });
 app.get("/_dev/mail", async () => outbox);
 let stopping = false;
 async function stop() {

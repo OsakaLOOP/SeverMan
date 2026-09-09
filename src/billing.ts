@@ -3,10 +3,11 @@ import type { Pool } from "pg";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { PlatformConfig } from "./platform-config.js";
 import { HttpError } from "./errors.js";
+import type { AfdianBilling } from "./afdian.js";
 
-export function registerBilling(app: FastifyInstance, config: PlatformConfig, pool: Pool, user: (request: FastifyRequest) => Promise<{ id: string; email: string }>) {
+export function registerBilling(app: FastifyInstance, config: PlatformConfig, pool: Pool, user: (request: FastifyRequest) => Promise<{ id: string; email: string }>, afdian?: AfdianBilling) {
   const stripe = config.stripe ? new Stripe(config.stripe.secret, { timeout: 5000, maxNetworkRetries: 1 }) : undefined;
-  app.get("/v1/billing/subscription", async (request) => ({ subscription: (await pool.query("SELECT status,price_id,updated_at FROM core.subscriptions WHERE user_id=$1", [(await user(request)).id])).rows[0] ?? null }));
+  app.get("/v1/billing/subscription", async (request) => ({ subscription: afdian ? await afdian.subscription((await user(request)).id) : (await pool.query("SELECT status,price_id,updated_at FROM core.subscriptions WHERE user_id=$1", [(await user(request)).id])).rows[0] ?? null }));
   app.post<{ Body: { price_id: string } }>("/v1/billing/checkout", { schema: { body: { type: "object", additionalProperties: false, required: ["price_id"], properties: { price_id: { type: "string", maxLength: 200 } } } } }, async (request) => {
     const current = await user(request);
     if (!stripe || !config.stripe) throw new HttpError(503, "BILLING_UNAVAILABLE");

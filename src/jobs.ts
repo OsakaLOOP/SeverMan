@@ -7,6 +7,7 @@ import type { PlatformConfig } from "./platform-config.js";
 import { HttpError } from "./errors.js";
 import { seal, signWebhook, unseal } from "./security.js";
 import { readResources } from "./resources.js";
+import { AfdianBilling } from "./afdian.js";
 
 export interface Operation {
   id: string; user_id: string; kind: "snapshot" | "mail" | "webhook" | "command";
@@ -16,11 +17,13 @@ export interface Operation {
 
 export class Jobs {
   readonly boss: PgBoss;
+  readonly afdian?: AfdianBilling;
   private transport;
   private recovery?: ReturnType<typeof setInterval>;
   constructor(private primary: Pool, private reader: Pool, private config: PlatformConfig, private captureMail?: (mail: { to: string; subject: string; text: string }) => void) {
     this.boss = new PgBoss({ connectionString: config.queueDatabaseUrl, schema: "jobs", max: 2, migrate: false, supervise: true });
     this.boss.on("error", () => console.error("任务队列连接错误"));
+    if (config.afdian) this.afdian = new AfdianBilling(primary, this.boss, config.afdian, config.secret, config.origin);
     this.transport = config.smtp ? nodemailer.createTransport({
       host: config.smtp.host, port: config.smtp.port, secure: config.smtp.secure,
       auth: { user: config.smtp.user, pass: config.smtp.password }, pool: true, maxConnections: 1,
@@ -30,6 +33,7 @@ export class Jobs {
   async start(worker: boolean) {
     await this.boss.start();
     await this.boss.createQueue("platform", { retryLimit: 5, retryDelay: 1, retryBackoff: true, expireInSeconds: 30 });
+    await this.afdian?.start(worker);
     if (worker) {
       await this.recover();
       this.recovery = setInterval(() => { void this.recover().catch(() => console.error("任务恢复检查失败")); }, 15_000);
