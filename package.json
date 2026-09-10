@@ -42,8 +42,7 @@
     "pg-boss": "12.30.0",
     "qrcode": "1.5.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "stripe": "22.6.1"
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

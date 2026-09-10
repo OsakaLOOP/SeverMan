@@ -15,7 +15,6 @@ export interface UnifiedConfigDocument {
     github: { client_id: string; client_secret: string } | null;
     smtp: { host: string; port: number; secure: boolean; user: string; password: string; from: string } | null;
     storage: { endpoint: string; region: string; bucket: string; key_id: string; key_secret: string } | null;
-    stripe: { secret: string; webhook_secret: string; prices: string[] } | null;
     afdian: (AfdianConfig & { user_id?: string }) | null;
     webhook_targets: PlatformConfig["webhookTargets"];
   };
@@ -25,9 +24,9 @@ const keys = {
   server: ["host", "port", "log_level", "trusted_proxy_cidrs"],
   database: ["database_url", "read_database_url", "auth_database_url", "queue_database_url"],
   auth: ["origin", "secret", "require_verification"],
-  integrations: ["github", "smtp", "storage", "stripe", "afdian", "webhook_targets"],
+  integrations: ["github", "smtp", "storage", "afdian", "webhook_targets"],
 };
-const restartPaths = ["server.host", "server.port", "server.log_level", "server.trusted_proxy_cidrs", "database", "auth.origin", "auth.secret", "auth.require_verification", "integrations.github", "integrations.smtp", "integrations.storage", "integrations.stripe", "integrations.afdian.userId"];
+const restartPaths = ["server.host", "server.port", "server.log_level", "server.trusted_proxy_cidrs", "database", "auth.origin", "auth.secret", "auth.require_verification", "integrations.github", "integrations.smtp", "integrations.storage", "integrations.afdian.userId"];
 const plain = (value: unknown, path: string) => {
   if (typeof value !== "string" || value.length > 16384) throw new HttpError(400, "CONFIG_INVALID", `${path} 配置值无效`);
   return value;
@@ -55,9 +54,9 @@ export function validateConfigDocument(value: unknown): UnifiedConfigDocument {
   if (auth.secret !== "***" && String(auth.secret).length < 32 || typeof auth.require_verification !== "boolean") throw new HttpError(400, "CONFIG_INVALID");
   try { if (!["http:", "https:"].includes(new URL(String(auth.origin)).protocol)) throw new Error(); } catch { throw new HttpError(400, "CONFIG_INVALID", "auth.origin 必须是 HTTP(S) 地址"); }
   const integrations = object(root.integrations, "integrations"); exact(integrations, keys.integrations, "integrations");
-  for (const [name, expected] of [["github", ["client_id", "client_secret"]], ["smtp", ["host", "port", "secure", "user", "password", "from"]], ["storage", ["endpoint", "region", "bucket", "key_id", "key_secret"]], ["stripe", ["secret", "webhook_secret", "prices"]]] as const) {
+  for (const [name, expected] of [["github", ["client_id", "client_secret"]], ["smtp", ["host", "port", "secure", "user", "password", "from"]], ["storage", ["endpoint", "region", "bucket", "key_id", "key_secret"]]] as const) {
     const item = nullableObject(integrations[name], `integrations.${name}`, expected);
-    if (item) for (const [key, itemValue] of Object.entries(item)) key === "port" ? (Number.isInteger(itemValue) || (() => { throw new HttpError(400, "CONFIG_INVALID"); })()) : key === "secure" ? (typeof itemValue === "boolean" || (() => { throw new HttpError(400, "CONFIG_INVALID"); })()) : key === "prices" ? (Array.isArray(itemValue) && itemValue.every((price) => typeof price === "string") || (() => { throw new HttpError(400, "CONFIG_INVALID"); })()) : plain(itemValue, `integrations.${name}.${key}`);
+    if (item) for (const [key, itemValue] of Object.entries(item)) key === "port" ? (Number.isInteger(itemValue) || (() => { throw new HttpError(400, "CONFIG_INVALID"); })()) : key === "secure" ? (typeof itemValue === "boolean" || (() => { throw new HttpError(400, "CONFIG_INVALID"); })()) : plain(itemValue, `integrations.${name}.${key}`);
   }
   const afdian = nullableObject(integrations.afdian, "integrations.afdian", ["userId", "token", "publicKey", "plans", "oauth"]);
   if (afdian) {
@@ -96,7 +95,6 @@ export function documentFromConfig(base: Config, platform: PlatformConfig): Unif
     integrations: { github: platform.github ? { client_id: platform.github.clientId, client_secret: platform.github.clientSecret } : null,
       smtp: platform.smtp ? { host: platform.smtp.host, port: platform.smtp.port, secure: platform.smtp.secure, user: platform.smtp.user, password: platform.smtp.password, from: platform.smtp.from } : null,
       storage: platform.storage ? { endpoint: platform.storage.endpoint, region: platform.storage.region, bucket: platform.storage.bucket, key_id: platform.storage.keyId, key_secret: platform.storage.keySecret } : null,
-      stripe: platform.stripe ? { secret: platform.stripe.secret, webhook_secret: platform.stripe.webhookSecret, prices: platform.stripe.prices } : null,
       afdian: platform.afdian ? { ...platform.afdian } : null, webhook_targets: platform.webhookTargets }, };
 }
 export function redactedDocument(document: UnifiedConfigDocument): UnifiedConfigDocument {
@@ -182,7 +180,6 @@ export class RuntimeConfig {
     if (document.integrations.github) this.platform.github = { clientId: document.integrations.github.client_id, clientSecret: document.integrations.github.client_secret }; else this.platform.github = undefined;
     if (document.integrations.smtp) this.platform.smtp = { host: document.integrations.smtp.host, port: document.integrations.smtp.port, secure: document.integrations.smtp.secure, user: document.integrations.smtp.user, password: document.integrations.smtp.password, from: document.integrations.smtp.from }; else this.platform.smtp = undefined;
     if (document.integrations.storage) this.platform.storage = { endpoint: document.integrations.storage.endpoint, region: document.integrations.storage.region, bucket: document.integrations.storage.bucket, keyId: document.integrations.storage.key_id, keySecret: document.integrations.storage.key_secret }; else this.platform.storage = undefined;
-    if (document.integrations.stripe) this.platform.stripe = { secret: document.integrations.stripe.secret, webhookSecret: document.integrations.stripe.webhook_secret, prices: document.integrations.stripe.prices }; else this.platform.stripe = undefined;
     if (document.integrations.afdian) this.platform.afdian = { ...document.integrations.afdian };
     this.applyHot(document);
   }

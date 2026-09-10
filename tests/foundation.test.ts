@@ -41,7 +41,7 @@ test("迁移与健康检查：未迁移返回 503，迁移后返回 200，重复
     assert.equal((await app.inject("/health/live")).statusCode, 200);
     assert.equal((await app.inject("/health/ready")).statusCode, 503);
     const applied = await Promise.all([migrate(local.admin), migrate(local.admin)]);
-    assert.equal(applied.flat().length, 5);
+    assert.equal(applied.flat().length, 6);
     assert.equal(applied.flat()[0], "001_services.sql");
     assert.deepEqual(await migrate(local.admin), []);
     const ready = await app.inject("/health/ready");

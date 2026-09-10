@@ -37,7 +37,7 @@ npm run dev:local
 
 修改面板后执行 `npm run build` 并刷新；修改服务器代码后重启 `dev:local`。需要保留业务数据时使用外部 PostgreSQL。
 
-已实现统一身份/OIDC、邮箱验证、GitHub 关联、TOTP/恢复码、服务注册、跨站查询、任务与签名命令、OSS 直传、爱发电支付订阅、可选 Stripe 接口及管理面板。存活检查为 `/health/live`，就绪检查为 `/health/ready`。
+已实现统一身份/OIDC、邮箱验证、GitHub 关联、TOTP/恢复码、服务注册、跨站查询、任务与签名命令、OSS 直传、爱发电支付订阅及管理面板。存活检查为 `/health/live`，就绪检查为 `/health/ready`。
 
 ## 外部数据库
 

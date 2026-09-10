@@ -1,6 +1,6 @@
 # 统一配置
 
-模板文件为 [`config/unified.template.json`](../config/unified.template.json)，覆盖服务进程、四类 PostgreSQL 连接、统一身份、GitHub、SMTP、S3、Stripe、爱发电和 Webhook 目标。`null` 表示关闭可选组件；复制模板后填写实际值，JSON 使用 UTF-8；密钥不提交到 Git。
+模板文件为 [`config/unified.template.json`](../config/unified.template.json)，覆盖服务进程、四类 PostgreSQL 连接、统一身份、GitHub、SMTP、S3、爱发电和 Webhook 目标。`null` 表示关闭可选组件；复制模板后填写实际值，JSON 使用 UTF-8；密钥不提交到 Git。
 
 ## 字段填写
 
@@ -12,7 +12,7 @@
 
 GitHub 集成填写 `integrations.github.client_id` 和 `client_secret`。两项来自 GitHub OAuth App，回调地址固定为 `https://中心域名/api/auth/callback/github`，开发环境则使用对应的本地中心地址。完成配置并重启 core/worker 后，登录页会出现 GitHub 登录入口；Better Auth 同时支持在已登录账号中关联 GitHub 身份。暂时不用 GitHub 时将整个字段设为 `null`。
 
-`integrations.smtp` 填写 SMTP 主机、端口、TLS 开关、账号、密码和发件人地址，用于邮箱验证、密码重置和通知邮件。`integrations.storage` 对应 S3 兼容 OSS，填写 endpoint、region、bucket、访问密钥 ID 和密钥；上传采用预签名 URL，文件正文不经过 core。`integrations.stripe` 预留 Stripe secret、webhook secret 和 price ID 列表，未启用时设为 `null`。
+`integrations.smtp` 填写 SMTP 主机、端口、TLS 开关、账号、密码和发件人地址，用于邮箱验证、密码重置和通知邮件。`integrations.storage` 对应 S3 兼容 OSS，填写 endpoint、region、bucket、访问密钥 ID 和密钥；上传采用预签名 URL，文件正文不经过 core。
 
 `integrations.afdian` 填写爱发电商户 `userId`、API `token`、RSA webhook 公钥和套餐规则；`planId` 是爱发电后台的 32 位方案 ID，`id` 是中心内部唯一标识，`entitlements` 是授予子站的权益键，`permanent` 表示永久权益，`enabled` 控制套餐是否可用。需要爱发电账号关联时再填写 `oauth.clientId/clientSecret`，否则可删除该对象或保留空字符串。没有爱发电配置时将整个字段设为 `null`，模板中的占位符不能直接提交。
 
@@ -28,7 +28,7 @@ GitHub 集成填写 `integrations.github.client_id` 和 `client_secret`。两项
 npm run config:validate -- ./sm-unified-config.json
 ```
 
-套餐规则、Webhook 目标和爱发电现有连接可以热更新，当前进程立即使用新值。服务监听、数据库连接、认证来源、认证密钥、GitHub、SMTP、S3、Stripe 变化会写入版本并返回重启路径，需按部署文档重启 core 和 worker；爱发电模块从未配置变为已配置同样需要重启以注册路由。认证密钥不能通过热更新轮换，先更新部署环境的 `AUTH_SECRET`，再重启服务并重新读取配置。
+套餐规则、Webhook 目标和爱发电现有连接可以热更新，当前进程立即使用新值。服务监听、数据库连接、认证来源、认证密钥、GitHub、SMTP、S3 变化会写入版本并返回重启路径，需按部署文档重启 core 和 worker；爱发电模块从未配置变为已配置同样需要重启以注册路由。认证密钥不能通过热更新轮换，先更新部署环境的 `AUTH_SECRET`，再重启服务并重新读取配置。
 
 配置原文使用认证密钥加密存储，管理接口仅返回 `***`。审计记录保存版本、来源、变更路径和重启路径，不保存配置正文。服务启动先读取持久化版本，再初始化任务、支付和邮件组件；数据库中没有持久化配置时使用环境变量。
 

@@ -7,39 +7,21 @@
     "trusted_proxy_cidrs": ["172.30.0.2/32"]
   },
   "database": {
-    "database_url": "postgresql://sm_app:替换为数据库密码@postgres:5432/sm",
-    "read_database_url": "postgresql://sm_read:替换为只读密码@postgres:5432/sm",
-    "auth_database_url": "postgresql://sm_app:替换为数据库密码@postgres:5432/sm",
-    "queue_database_url": "postgresql://sm_app:替换为数据库密码@postgres:5432/sm"
+    "database_url": "***",
+    "read_database_url": "***",
+    "auth_database_url": "***",
+    "queue_database_url": "***"
   },
   "auth": {
     "origin": "https://auth.example.com",
-    "secret": "替换为至少32字符的认证密钥",
+    "secret": "***",
     "require_verification": true
   },
   "integrations": {
     "github": null,
     "smtp": null,
     "storage": null,
-    "stripe": null,
-    "afdian": {
-      "userId": "替换为32位爱发电用户ID",
-      "token": "替换为爱发电API令牌",
-      "publicKey": "-----BEGIN PUBLIC KEY-----\n替换为官方RSA公钥\n-----END PUBLIC KEY-----",
-      "plans": [
-        {
-          "id": "railround-monthly",
-          "planId": "替换为32位方案ID",
-          "entitlements": ["railround.premium"],
-          "permanent": false,
-          "enabled": true
-        }
-      ],
-      "oauth": {
-        "clientId": "",
-        "clientSecret": ""
-      }
-    },
+    "afdian": null,
     "webhook_targets": {}
   }
 }

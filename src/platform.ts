@@ -9,7 +9,6 @@ import type { DatabaseResources } from "./db/pools.js";
 import { HttpError } from "./errors.js";
 import { readResources } from "./resources.js";
 import { registerStorage } from "./storage.js";
-import { registerBilling } from "./billing.js";
 import { registerAfdian } from "./afdian-routes.js";
 import { RuntimeConfig, documentFromConfig, type UnifiedConfigDocument } from "./runtime-config.js";
 import type { Config } from "./config.js";
@@ -58,14 +57,14 @@ export async function registerPlatform(app: FastifyInstance, database: DatabaseR
   };
   await app.register(async (api) => {
     api.addHook("onRequest", async (request) => {
-      if (!["/v1/billing/webhook", "/v1/billing/afdian/webhook"].includes(request.url.split("?")[0]!) && !["GET", "HEAD", "OPTIONS"].includes(request.method) && request.headers.origin !== config.origin) throw new HttpError(403, "ORIGIN_REJECTED");
+      if (request.url.split("?")[0] !== "/v1/billing/afdian/webhook" && !["GET", "HEAD", "OPTIONS"].includes(request.method) && request.headers.origin !== config.origin) throw new HttpError(403, "ORIGIN_REJECTED");
     });
     api.get("/v1/me", async (request) => {
       const current = await user(request);
       const isAdmin = Boolean((await database.primary.query("SELECT 1 FROM core.admin_account WHERE user_id=$1", [current.id])).rowCount);
       return { user: current, admin: isAdmin, admin_ready: isAdmin && (options.requireAdminTwoFactor === false || Boolean(current.twoFactorEnabled)) };
     });
-    api.get("/v1/config", async () => ({ github: Boolean(config.github), mail: Boolean(config.smtp || options.captureMail), storage: Boolean(config.storage), billing: Boolean(config.afdian || config.stripe), afdian: Boolean(config.afdian), afdian_oauth: Boolean(config.afdian?.oauth), prices: config.stripe?.prices ?? [] }));
+    api.get("/v1/config", async () => ({ github: Boolean(config.github), mail: Boolean(config.smtp || options.captureMail), storage: Boolean(config.storage), billing: Boolean(config.afdian), afdian: Boolean(config.afdian), afdian_oauth: Boolean(config.afdian?.oauth) }));
     api.get("/v1/admin/config", async (request) => {
       await admin(request);
       return { version: runtime.getVersion(), applied_version: runtime.getAppliedVersion(), restart_required: runtime.getRestartRequired(), document: runtime.getDocument(), template: runtime.template() };
@@ -176,7 +175,7 @@ export async function registerPlatform(app: FastifyInstance, database: DatabaseR
     });
     api.get("/v1/admin/status", async (request) => {
       await admin(request);
-      return { uptime_seconds: Math.round(process.uptime()), memory: process.memoryUsage(), connections: { active: database.primary.totalCount - database.primary.idleCount, waiting: database.primary.waitingCount }, operations: (await database.primary.query("SELECT status,count(*)::int AS count FROM core.operations GROUP BY status")).rows, integrations: { mail: Boolean(config.smtp || options.captureMail), storage: Boolean(config.storage), billing: Boolean(config.afdian || config.stripe) } };
+      return { uptime_seconds: Math.round(process.uptime()), memory: process.memoryUsage(), connections: { active: database.primary.totalCount - database.primary.idleCount, waiting: database.primary.waitingCount }, operations: (await database.primary.query("SELECT status,count(*)::int AS count FROM core.operations GROUP BY status")).rows, integrations: { mail: Boolean(config.smtp || options.captureMail), storage: Boolean(config.storage), billing: Boolean(config.afdian) } };
     });
     api.get("/v1/admin/audit", async (request) => { await admin(request); return { items: (await database.primary.query("SELECT * FROM core.audit_events ORDER BY id DESC LIMIT 100")).rows }; });
     api.post("/v1/sign-out-all", async (request) => {
@@ -186,7 +185,6 @@ export async function registerPlatform(app: FastifyInstance, database: DatabaseR
       return { success: true };
     });
     registerStorage(api, config, database.primary, user);
-    registerBilling(api, config, database.primary, user, jobs.afdian);
     if (jobs.afdian) registerAfdian(api, jobs.afdian, database.primary, user, admin);
   });
 

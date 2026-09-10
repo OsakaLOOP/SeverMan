@@ -2,7 +2,7 @@
 
 ## 范围与选型
 
-爱发电为主支付渠道，使用官方 Open API、RSA-SHA256 Webhook 签名和 OAuth2 关联授权。协议实现采用 Node.js 内置 `fetch`、`crypto`，后台执行复用 pg-boss 与 PostgreSQL。Stripe 接口作为可选渠道保留，启用爱发电后面板默认展示爱发电订阅。
+爱发电是支付渠道，使用官方 Open API、RSA-SHA256 Webhook 签名和 OAuth2 关联授权。协议实现采用 Node.js 内置 `fetch`、`crypto`，后台执行复用 pg-boss 与 PostgreSQL。
 
 支付系统从空数据开始。KV 导入、旧支付记录迁移及历史格式兼容均不在开发范围。系统记录上线后的订单、核销与权益，供用户查询和故障恢复。
 

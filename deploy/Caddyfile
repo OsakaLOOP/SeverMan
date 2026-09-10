@@ -1,3 +1,7 @@
+{
+  email mywrh15@126.com
+}
+
 {$AUTH_DOMAIN} {
   encode zstd gzip
   header {

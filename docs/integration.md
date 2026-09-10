@@ -59,8 +59,6 @@ npm run resource:register -- examples/site/resource.json
 
 爱发电为主支付渠道，配置 `AFDIAN_USER_ID`、`AFDIAN_TOKEN` 和 `AFDIAN_PLANS_JSON`；Webhook 地址 `/v1/billing/afdian/webhook`。付款关联、OAuth2、API 同步、异步核销及子站只读权益见 [支付接入](billing.md)。子站可使用 `sdk/entitlements.ts` 在业务事务中读取有效权益，页面按用户本人权限展示订单。
 
-可选 Stripe 接口使用 `STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、`STRIPE_PRICE_IDS`，通知地址为 `/v1/billing/webhook`。
-
 ## 原有站点迁移
 
 导出现有 KV 标识，建立 `旧站点ID + 旧用户ID -> 中心用户ID` 映射。用户登录旧账号与中心账号核验归属，邮箱用于联系。按站迁移数据和视图，暂停旧写入口后导入最后变更，再启用 BFF。保存旧数据和切换版本，核对条数、归属、分页和权限后开放。

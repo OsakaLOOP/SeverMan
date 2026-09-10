@@ -61,7 +61,6 @@ type SettingsType = {
   billing: boolean;
   afdian?: boolean;
   afdian_oauth?: boolean;
-  prices: string[];
 };
 const messages: Record<string, string> = {
   AUTH_REQUIRED: "请先登录",
@@ -129,7 +128,6 @@ function App() {
     storage: false,
     mail: false,
     billing: false,
-    prices: [],
   });
   const [tab, setTab] = useState(new URLSearchParams(location.search).has("billing") ? "billing" : "services");
   const [error, setError] = useState("");
@@ -1010,39 +1008,7 @@ function App() {
         {tab === "billing" && !settings.afdian && (
           <section>
             <h2>订阅状态</h2>
-            <p className="muted">
-              {settings.billing
-                ? "选择已发布的订阅方案。"
-                : "订阅服务尚未开放。"}
-            </p>
-            <button
-              onClick={() =>
-                void act(async () =>
-                  setResult(await api("/v1/billing/subscription")),
-                )
-              }
-            >
-              查询订阅
-            </button>
-            {settings.prices.map((price) => (
-              <button
-                key={price}
-                onClick={() =>
-                  void act(async () => {
-                    const r = await api<{ url: string }>(
-                      "/v1/billing/checkout",
-                      "POST",
-                      { price_id: price },
-                      crypto.randomUUID(),
-                    );
-                    location.href = r.url;
-                  })
-                }
-              >
-                {price}
-              </button>
-            ))}
-            {result !== null && <pre>{JSON.stringify(result, null, 2)}</pre>}
+            <p className="muted">订阅服务尚未开放。</p>
           </section>
         )}
         {tab === "admin" && (

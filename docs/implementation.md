@@ -46,7 +46,7 @@
 
 状态：已完成外围接口与部署文件，进入上机验收。
 
-已完成 S3 兼容直传授权与确认、邮件、Webhook、Stripe Checkout/订阅事件、Compose/Caddy、迁移工具镜像、备份恢复脚本和定时单元。上机步骤见 [部署文档](deployment.md)。
+已完成 S3 兼容直传授权与确认、邮件、Webhook、Compose/Caddy、迁移工具镜像、备份恢复脚本和定时单元。上机步骤见 [部署文档](deployment.md)。
 
 验收：目标 Ubuntu 主机上的容量、带宽、延迟和恢复演练。支付网关与 OSS 厂商按实际账号接入。
 
@@ -70,6 +70,6 @@ RailRound 作为独立仓库按四个阶段推进：第一阶段完成 profile �
 
 本机已通过 16 项真实 PostgreSQL 集成测试、TypeScript 检查、生产构建、桌面/移动浏览器检查，生产依赖审计 0 项漏洞。测试覆盖 OIDC 两客户端、真实 HTTP BFF、PKCE/state、令牌轮换、邮件重置、TOTP/恢复码、全站撤销、跨站快照、签名命令、重复投递和任务恢复。支付已验证原文签名与事件去重。
 
-Docker 运行、真实 GitHub/SMTP/OSS/Stripe 账号通信、EdgeOne 发布、实际站点迁移和整机性能在目标环境验收。性能数值属于验收目标。
+Docker 运行、真实 GitHub/SMTP/OSS 账号通信、EdgeOne 发布、实际站点迁移和整机性能在目标环境验收。性能数值属于验收目标。
 
-源码入口：`src/auth.ts`、`src/platform.ts`、`src/jobs.ts`、`src/resources.ts`、`src/storage.ts`、`src/billing.ts`；SDK 在 `sdk/`，样板在 `examples/site/`，面板在 `web/`，部署在 `deploy/`。
+源码入口：`src/auth.ts`、`src/platform.ts`、`src/jobs.ts`、`src/resources.ts`、`src/storage.ts`；SDK 在 `sdk/`，样板在 `examples/site/`，面板在 `web/`，部署在 `deploy/`。

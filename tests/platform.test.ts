@@ -14,8 +14,6 @@ import { registerBff } from "../sdk/bff.js";
 import { createOTP } from "@better-auth/utils/otp";
 import { base32 } from "@better-auth/utils/base32";
 import { Jobs } from "../src/jobs.js";
-import { registerBilling } from "../src/billing.js";
-import Stripe from "stripe";
 import { registerCommands } from "../sdk/commands.js";
 import type { PlatformConfig } from "../src/platform-config.js";
 
@@ -138,7 +136,7 @@ test("签名时效和加密校验，外部服务未配置时返回明确状态",
   const upload = await app.inject({ method: "POST", url: "/v1/uploads", headers: { cookie: alice, origin }, payload: { content_type: "image/png", size: 100 } });
   assert.equal(upload.statusCode, 503);
   const billing = await app.inject({ method: "POST", url: "/v1/billing/checkout", headers: { cookie: alice, origin, "idempotency-key": "payment" }, payload: { price_id: "test" } });
-  assert.equal(billing.statusCode, 503);
+  assert.equal(billing.statusCode, 404);
 });
 
 test("BFF 真实 HTTP 登录、错误 state、续期轮换与本站退出", async () => {
@@ -232,21 +230,6 @@ test("工作进程恢复过期执行、依赖失败传播和重试耗尽", async
     assert.equal((await eventually(() => jobs.get(child, aliceId), (op) => op.status === "failed")).error_code, "DEPENDENCY_FAILED");
     assert.equal((await jobs.get(exhausted, aliceId)).error_code, "RETRY_EXHAUSTED");
   } finally { await jobs.stop(); }
-});
-
-test("支付原文签名、重复通知与乱序删除事件", async () => {
-  const billing = Fastify();
-  const webhookSecret = "whsec_integration_only";
-  const stripe = new Stripe("sk_test_integration_only");
-  registerBilling(billing, { ...config(), stripe: { secret: "sk_test_integration_only", webhookSecret, prices: [] } }, local.admin, async () => ({ id: aliceId, email: "alice@example.com" }));
-  const payload = JSON.stringify({ id: "evt_test_deleted", type: "customer.subscription.deleted", created: 100, data: { object: { id: "sub_test", status: "canceled", metadata: { user_id: aliceId }, items: { data: [{ price: { id: "price_test" } }] } } } });
-  const signed = stripe.webhooks.generateTestHeaderString({ payload, secret: webhookSecret });
-  try {
-    assert.equal((await billing.inject({ method: "POST", url: "/v1/billing/webhook", headers: { "content-type": "application/json", "stripe-signature": signed }, payload: payload + " " })).statusCode, 400);
-    for (let i = 0; i < 2; i++) assert.equal((await billing.inject({ method: "POST", url: "/v1/billing/webhook", headers: { "content-type": "application/json", "stripe-signature": signed }, payload })).statusCode, 200);
-    assert.equal((await local.admin.query("SELECT count(*)::int AS count FROM core.payment_events")).rows[0].count, 1);
-    assert.equal((await local.admin.query("SELECT status FROM core.subscriptions WHERE user_id=$1", [aliceId])).rows[0].status, "canceled");
-  } finally { await billing.close(); }
 });
 
 test("全站撤销后中心与 BFF 会话无法继续访问", async () => {
