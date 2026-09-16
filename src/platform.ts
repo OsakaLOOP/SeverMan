@@ -17,7 +17,7 @@ export interface PlatformOptions {
   config: PlatformConfig;
   baseConfig?: Config;
   worker?: boolean;
-  captureMail?: (mail: { to: string; subject: string; text: string }) => void;
+  captureMail?: (mail: { to: string; subject: string; text: string; html?: string }) => void;
   requireAdminTwoFactor?: boolean;
 }
 
@@ -29,7 +29,7 @@ export async function registerPlatform(app: FastifyInstance, database: DatabaseR
   const authPool = new Pool({ connectionString: config.authDatabaseUrl, max: 3, options: "-c search_path=auth", connectionTimeoutMillis: 1000 });
   authPool.on("error", () => app.log.error("认证数据库连接错误"));
   const jobs = new Jobs(database.primary, database.reader, config, options.captureMail);
-  const auth = createAuth(config, authPool, (to, subject, text) => jobs.mail(to, subject, text), async (id) => Boolean((await database.primary.query('SELECT 1 FROM core.admin_account a JOIN auth."user" u ON u.id::text=a.user_id WHERE a.user_id=$1 AND ($2 OR u."twoFactorEnabled"=true)', [id, options.requireAdminTwoFactor === false])).rowCount));
+  const auth = createAuth(config, authPool, (to, subject, text, html) => jobs.mail(to, subject, text, html), async (id) => Boolean((await database.primary.query('SELECT 1 FROM core.admin_account a JOIN auth."user" u ON u.id::text=a.user_id WHERE a.user_id=$1 AND ($2 OR u."twoFactorEnabled"=true)', [id, options.requireAdminTwoFactor === false])).rowCount));
   app.addHook("onClose", async () => { await jobs.stop(); await authPool.end(); });
   await jobs.start(options.worker ?? false);
   const configPoll = setInterval(() => { void runtime.sync().catch(() => app.log.warn("配置热更新同步失败")); }, 2000);

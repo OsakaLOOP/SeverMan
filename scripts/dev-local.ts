@@ -9,7 +9,7 @@ import { readPlatformConfig } from "../src/platform-config.js";
 const database = await startLocalPostgres();
 const port = Number(process.env.PORT ?? "3001");
 const origin = `http://127.0.0.1:${port}`;
-const outbox: { to: string; subject: string; text: string }[] = [];
+const outbox: { to: string; subject: string; text: string; html?: string }[] = [];
 const secret = randomBytes(32).toString("hex");
 const app = buildApp({
   host: "127.0.0.1",

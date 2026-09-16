@@ -3,8 +3,9 @@ import { jwt, twoFactor } from "better-auth/plugins";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import type { Pool } from "pg";
 import type { PlatformConfig } from "./platform-config.js";
+import { verificationEmail, resetPasswordEmail } from "./mail-templates.js";
 
-export type SendMail = (to: string, subject: string, text: string) => Promise<void>;
+export type SendMail = (to: string, subject: string, text: string, html?: string) => Promise<void>;
 
 export function createAuth(config: PlatformConfig, pool: Pool, sendMail: SendMail, canManageClients: (userId: string) => Promise<boolean> = async () => false) {
   return betterAuth({
@@ -19,12 +20,18 @@ export function createAuth(config: PlatformConfig, pool: Pool, sendMail: SendMai
       minPasswordLength: 12,
       requireEmailVerification: config.requireVerification,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async ({ user, url }) => sendMail(user.email, "重置密码", url),
+      sendResetPassword: async ({ user, url }) => {
+        const mail = resetPasswordEmail(url);
+        await sendMail(user.email, mail.subject, mail.text, mail.html);
+      },
     },
     emailVerification: {
       sendOnSignUp: config.requireVerification,
       autoSignInAfterVerification: false,
-      sendVerificationEmail: async ({ user, url }) => sendMail(user.email, "验证邮箱", url),
+      sendVerificationEmail: async ({ user, url }) => {
+        const mail = verificationEmail(url);
+        await sendMail(user.email, mail.subject, mail.text, mail.html);
+      },
     },
     socialProviders: config.github ? { github: config.github } : {},
     account: { accountLinking: { enabled: true, trustedProviders: [] }, encryptOAuthTokens: true },

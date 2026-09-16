@@ -80,6 +80,9 @@ const messages: Record<string, string> = {
   AFDIAN_INVALID_MONTHS: "订阅时长与套餐周期不一致",
   AFDIAN_OAUTH_UNAVAILABLE: "账号关联尚未开放",
   AFDIAN_API_UNAVAILABLE: "爱发电暂时无法连接，请稍后重试",
+  EMAIL_NOT_VERIFIED: "邮箱尚未验证，请查收验证邮件",
+  INVALID_TOKEN: "验证链接无效或已使用",
+  TOKEN_EXPIRED: "验证链接已过期，请重新获取",
 };
 async function api<T>(
   path: string,
@@ -103,8 +106,16 @@ async function api<T>(
     );
   return data;
 }
-function check(result: { error?: { message?: string } | null }) {
-  if (result.error) throw new Error(result.error.message ?? "操作失败");
+function check(result: { error?: { message?: string; code?: string } | null }) {
+  if (result.error) {
+    const code = result.error.code;
+    const msg =
+      (code && messages[code]) ||
+      (result.error.message && messages[result.error.message]) ||
+      result.error.message ||
+      "操作失败";
+    throw new Error(msg);
+  }
 }
 const labels: Record<string, string> = {
   pending: "等待中",
@@ -156,7 +167,9 @@ function App() {
       ? "signup"
       : location.pathname === "/reset-password"
         ? "reset"
-        : "signin",
+        : location.pathname === "/verify-result"
+          ? "verify-result"
+          : "signin",
   );
   const [otp, setOtp] = useState(false);
   const [backupMode, setBackupMode] = useState(false);
@@ -234,7 +247,8 @@ function App() {
         <p>正在连接服务中心</p>
       </main>
     );
-  if (!me)
+  if (!me) {
+    const verifyError = new URLSearchParams(location.search).get("error");
     return (
       <main className="auth-page">
         <div className="brand">
@@ -244,20 +258,26 @@ function App() {
         <section className="auth-form">
           <span className="eyebrow">统一账号</span>
           <h1>
-            {otp
-              ? "二次验证"
-              : mode === "signup"
-                ? "创建账号"
-                : mode === "forgot"
-                  ? "找回密码"
-                  : mode === "reset"
-                    ? "设置新密码"
-                    : "登录"}
+            {mode === "verify-result"
+              ? (verifyError ? "邮箱验证未通过" : "邮箱验证成功")
+              : otp
+                ? "二次验证"
+                : mode === "signup"
+                  ? "创建账号"
+                  : mode === "forgot"
+                    ? "找回密码"
+                    : mode === "reset"
+                      ? "设置新密码"
+                      : "登录"}
           </h1>
           <p className="muted">
-            {mode === "signup"
-              ? "使用一个账号访问已接入的服务。"
-              : "管理你的服务、资料与登录设备。"}
+            {mode === "verify-result"
+              ? (verifyError
+                  ? "验证链接无法使用，可在此重新发送验证邮件。"
+                  : "你的邮箱已成功验证，请前往登录。")
+              : mode === "signup"
+                ? "使用一个账号访问已接入的服务。"
+                : "管理你的服务、资料与登录设备。"}
           </p>
           {error && (
             <div role="alert" className="error">
@@ -269,173 +289,246 @@ function App() {
               {notice}
             </div>
           )}
-          <form
-            onSubmit={(e) => {
-              const data = form(e);
-              void act(async () => {
-                if (otp) {
-                  check(
-                    await (backupMode ? auth.twoFactor.verifyBackupCode({ code: String(data.get("code")) }) : auth.twoFactor.verifyTotp({ code: String(data.get("code")) })),
-                  );
-                  await refresh();
-                  return;
-                }
-                if (mode === "forgot") {
-                  check(
-                    await auth.requestPasswordReset({
+          {mode === "verify-result" ? (
+            <div>
+              {verifyError ? (
+                <>
+                  <div role="alert" className="error">
+                    {verifyError === "INVALID_TOKEN"
+                      ? "验证链接无效或已使用。可能原因：链接不完整、已被点击验证或已被新邮件覆盖。"
+                      : verifyError === "TOKEN_EXPIRED"
+                        ? "验证链接已过期（有效期 1 小时），请重新发送验证邮件。"
+                        : (messages[verifyError] || "验证遇到异常，请重新获取验证邮件。")}
+                  </div>
+                  <form
+                    onSubmit={(e) => {
+                      const data = form(e);
+                      void act(async () => {
+                        check(
+                          await auth.sendVerificationEmail({
+                            email: String(data.get("email")),
+                            callbackURL: `${location.origin}/verify-result`,
+                          }),
+                        );
+                        setNotice("验证邮件已重新发送，请查收邮箱。");
+                      });
+                    }}
+                  >
+                    <label>
+                      注册邮箱
+                      <input
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        placeholder="请输入注册邮箱"
+                      />
+                    </label>
+                    <button className="primary full" disabled={busy}>
+                      {busy ? "发送中…" : "重新发送验证邮件"}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <div role="status" className="notice">
+                    邮箱验证已成功，账号现已可用。
+                  </div>
+                  <button
+                    className="primary full"
+                    onClick={() => {
+                      setMode("signin");
+                      window.history.replaceState({}, "", "/");
+                    }}
+                  >
+                    前往登录
+                  </button>
+                </>
+              )}
+              <div className="auth-links">
+                <button
+                  onClick={() => {
+                    setMode("signin");
+                    window.history.replaceState({}, "", "/");
+                  }}
+                >
+                  返回登录
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <form
+                onSubmit={(e) => {
+                  const data = form(e);
+                  void act(async () => {
+                    if (otp) {
+                      check(
+                        await (backupMode ? auth.twoFactor.verifyBackupCode({ code: String(data.get("code")) }) : auth.twoFactor.verifyTotp({ code: String(data.get("code")) })),
+                      );
+                      await refresh();
+                      return;
+                    }
+                    if (mode === "forgot") {
+                      check(
+                        await auth.requestPasswordReset({
+                          email: String(data.get("email")),
+                          redirectTo: `${location.origin}/reset-password`,
+                        }),
+                      );
+                      setNotice("若邮箱已注册，重置邮件将发送到该邮箱。");
+                      return;
+                    }
+                    if (mode === "reset") {
+                      check(
+                        await auth.resetPassword({
+                          newPassword: String(data.get("password")),
+                          token:
+                            new URLSearchParams(location.search).get("token") ?? "",
+                        }),
+                      );
+                      setMode("signin");
+                      setNotice("密码已更新，请登录。");
+                      return;
+                    }
+                    const credentials = {
                       email: String(data.get("email")),
-                      redirectTo: `${location.origin}/reset-password`,
-                    }),
-                  );
-                  setNotice("若邮箱已注册，重置邮件将发送到该邮箱。");
-                  return;
-                }
-                if (mode === "reset") {
-                  check(
-                    await auth.resetPassword({
-                      newPassword: String(data.get("password")),
-                      token:
-                        new URLSearchParams(location.search).get("token") ?? "",
-                    }),
-                  );
-                  setMode("signin");
-                  setNotice("密码已更新，请登录。");
-                  return;
-                }
-                const credentials = {
-                  email: String(data.get("email")),
-                  password: String(data.get("password")),
-                  callbackURL: location.origin,
-                };
-                const response =
-                  mode === "signup"
-                    ? await auth.signUp.email({
-                        ...credentials,
-                        name: String(data.get("name")),
-                      })
-                    : await auth.signIn.email(credentials);
-                check(response);
-                if (
-                  response.data &&
-                  "twoFactorRedirect" in response.data &&
-                  response.data.twoFactorRedirect
-                ) {
-                  setOtp(true);
-                  return;
-                }
-                if (mode === "signup") {
-                  setNotice("账号已创建，请查收验证邮件。");
-                  setMode("signin");
-                } else await refresh();
-              });
-            }}
-          >
-            {otp ? (
-              <label>
-                {backupMode ? "恢复码" : "验证码"}
-                <input
-                  name="code"
-                  inputMode={backupMode ? "text" : "numeric"}
-                  autoComplete="one-time-code"
-                  required
-                  pattern={backupMode ? undefined : "[0-9]{6}"}
-                />
-              </label>
-            ) : (
-              <>
-                {mode === "signup" && (
-                  <label>
-                    昵称
-                    <input
-                      name="name"
-                      autoComplete="nickname"
-                      required
-                      maxLength={100}
-                    />
-                  </label>
-                )}
-                {mode !== "reset" && (
-                  <label>
-                    邮箱
-                    <input
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                    />
-                  </label>
-                )}
-                {mode !== "forgot" && (
-                  <label>
-                    密码
-                    <input
-                      name="password"
-                      type="password"
-                      minLength={12}
-                      autoComplete={
-                        mode === "signin" ? "current-password" : "new-password"
-                      }
-                      required
-                    />
-                  </label>
-                )}
-              </>
-            )}
-            <button className="primary full" disabled={busy}>
-              {busy
-                ? "处理中…"
-                : otp
-                  ? "验证"
-                  : mode === "signup"
-                    ? "注册"
-                    : mode === "forgot"
-                      ? "发送重置邮件"
-                      : mode === "reset"
-                        ? "更新密码"
-                        : "登录"}
-            </button>
-          </form>
-          {otp && <button className="full" onClick={() => setBackupMode(!backupMode)}>{backupMode ? "使用验证器" : "使用恢复码"}</button>}
-          {settings.github && (
-            <button
-              className="full"
-              onClick={() =>
-                void act(async () => {
-                  check(
-                    await auth.signIn.social({
-                      provider: "github",
+                      password: String(data.get("password")),
                       callbackURL: location.origin,
-                    }),
-                  );
-                })
-              }
-            >
-              <Github size={17} />
-              使用 GitHub 登录
-            </button>
+                    };
+                    const response =
+                      mode === "signup"
+                        ? await auth.signUp.email({
+                            ...credentials,
+                            name: String(data.get("name")),
+                            callbackURL: `${location.origin}/verify-result`,
+                          })
+                        : await auth.signIn.email(credentials);
+                    check(response);
+                    if (
+                      response.data &&
+                      "twoFactorRedirect" in response.data &&
+                      response.data.twoFactorRedirect
+                    ) {
+                      setOtp(true);
+                      return;
+                    }
+                    if (mode === "signup") {
+                      setNotice("账号已创建，请查收验证邮件。");
+                      setMode("signin");
+                    } else await refresh();
+                  });
+                }}
+              >
+                {otp ? (
+                  <label>
+                    {backupMode ? "恢复码" : "验证码"}
+                    <input
+                      name="code"
+                      inputMode={backupMode ? "text" : "numeric"}
+                      autoComplete="one-time-code"
+                      required
+                      pattern={backupMode ? undefined : "[0-9]{6}"}
+                    />
+                  </label>
+                ) : (
+                  <>
+                    {mode === "signup" && (
+                      <label>
+                        昵称
+                        <input
+                          name="name"
+                          autoComplete="nickname"
+                          required
+                          maxLength={100}
+                        />
+                      </label>
+                    )}
+                    {mode !== "reset" && (
+                      <label>
+                        邮箱
+                        <input
+                          name="email"
+                          type="email"
+                          autoComplete="email"
+                          required
+                        />
+                      </label>
+                    )}
+                    {mode !== "forgot" && (
+                      <label>
+                        密码
+                        <input
+                          name="password"
+                          type="password"
+                          minLength={12}
+                          autoComplete={
+                            mode === "signin" ? "current-password" : "new-password"
+                          }
+                          required
+                        />
+                      </label>
+                    )}
+                  </>
+                )}
+                <button className="primary full" disabled={busy}>
+                  {busy
+                    ? "处理中…"
+                    : otp
+                      ? "验证"
+                      : mode === "signup"
+                        ? "注册"
+                        : mode === "forgot"
+                          ? "发送重置邮件"
+                          : mode === "reset"
+                            ? "更新密码"
+                            : "登录"}
+                </button>
+              </form>
+              {otp && <button className="full" onClick={() => setBackupMode(!backupMode)}>{backupMode ? "使用验证器" : "使用恢复码"}</button>}
+              {settings.github && (
+                <button
+                  className="full"
+                  onClick={() =>
+                    void act(async () => {
+                      check(
+                        await auth.signIn.social({
+                          provider: "github",
+                          callbackURL: location.origin,
+                        }),
+                      );
+                    })
+                  }
+                >
+                  <Github size={17} />
+                  使用 GitHub 登录
+                </button>
+              )}
+              <div className="auth-links">
+                <button
+                  onClick={() => {
+                    setMode(mode === "signup" ? "signin" : "signup");
+                    setOtp(false);
+                  }}
+                >
+                  {mode === "signup" ? "已有账号" : "创建账号"}
+                </button>
+                <button
+                  onClick={() => {
+                    setMode("forgot");
+                    setOtp(false);
+                  }}
+                >
+                  忘记密码
+                </button>
+              </div>
+            </>
           )}
-          <div className="auth-links">
-            <button
-              onClick={() => {
-                setMode(mode === "signup" ? "signin" : "signup");
-                setOtp(false);
-              }}
-            >
-              {mode === "signup" ? "已有账号" : "创建账号"}
-            </button>
-            <button
-              onClick={() => {
-                setMode("forgot");
-                setOtp(false);
-              }}
-            >
-              忘记密码
-            </button>
-          </div>
         </section>
         <footer>SM · 统一身份与服务</footer>
       </main>
     );
+  }
 
   const tabs = [
     { id: "services", label: "服务", icon: LayoutGrid },

@@ -20,7 +20,7 @@ export class Jobs {
   readonly afdian?: AfdianBilling;
   private transport;
   private recovery?: ReturnType<typeof setInterval>;
-  constructor(private primary: Pool, private reader: Pool, private config: PlatformConfig, private captureMail?: (mail: { to: string; subject: string; text: string }) => void) {
+  constructor(private primary: Pool, private reader: Pool, private config: PlatformConfig, private captureMail?: (mail: { to: string; subject: string; text: string; html?: string }) => void) {
     this.boss = new PgBoss({ connectionString: config.queueDatabaseUrl, schema: "jobs", max: 2, migrate: false, supervise: true });
     this.boss.on("error", () => console.error("任务队列连接错误"));
     if (config.afdian) this.afdian = new AfdianBilling(primary, this.boss, config.afdian, config.secret, config.origin);
@@ -108,9 +108,9 @@ export class Jobs {
       await delay(100);
     }
   }
-  async mail(to: string, subject: string, text: string) {
+  async mail(to: string, subject: string, text: string, html?: string) {
     if (!this.transport && !this.captureMail) throw new HttpError(503, "MAIL_UNAVAILABLE");
-    await this.submit("system-mail", "mail", { to, subject, text }, randomUUID());
+    await this.submit("system-mail", "mail", { to, subject, text, ...(html ? { html } : {}) }, randomUUID());
   }
   private async execute(id: string) {
     const operation = (await this.primary.query<Operation>("SELECT * FROM core.operations WHERE id=$1", [id])).rows[0];
@@ -133,7 +133,7 @@ export class Jobs {
       if (operation.kind === "snapshot") {
         result = await readResources(this.primary, this.reader, operation.user_id, operation.payload.resources as string[], Number(operation.payload.limit ?? 20));
       } else if (operation.kind === "mail") {
-        const mail = unseal<{ to: string; subject: string; text: string }>(String(operation.payload.encrypted), this.config.secret);
+        const mail = unseal<{ to: string; subject: string; text: string; html?: string }>(String(operation.payload.encrypted), this.config.secret);
         if (this.captureMail) this.captureMail(mail);
         else if (this.transport && this.config.smtp) await this.transport.sendMail({ ...mail, from: this.config.smtp.from, messageId: `<${id}@${new URL(this.config.origin).hostname}>` });
         else throw new Error("MAIL_UNAVAILABLE");
