@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { verifyWebhook } from "./security.js";
 import { Pool } from "pg";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { fromNodeHeaders } from "better-auth/node";
@@ -23,15 +24,45 @@ export interface PlatformOptions {
 
 export async function registerPlatform(app: FastifyInstance, database: DatabaseResources, options: PlatformOptions) {
   const config = options.config;
+  // Only identity endpoints are shared with explicitly trusted static frontends.
+  const browserOrigins = new Set(config.trustedOrigins ?? []);
+  app.addHook("onRequest", async (request, reply) => {
+    const path = request.url.split("?")[0] ?? "";
+    const identityRoute = path.startsWith("/api/auth/") || path === "/v1/config" || path === "/v1/me";
+    if (!identityRoute || !request.headers.origin || !browserOrigins.has(request.headers.origin)) return;
+    reply.header("Vary", "Origin").header("Access-Control-Allow-Origin", request.headers.origin)
+      .header("Access-Control-Allow-Credentials", "true");
+    if (request.method === "OPTIONS") return reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+      .header("Access-Control-Allow-Headers", "Content-Type").header("Access-Control-Max-Age", "600").code(204).send();
+  });
+
   const baseConfig = options.baseConfig ?? { host: "127.0.0.1", port: Number(new URL(config.origin).port || 3000), logLevel: "info", databaseUrl: config.authDatabaseUrl, readDatabaseUrl: config.authDatabaseUrl };
   const runtime = new RuntimeConfig(database.primary, baseConfig, config);
   await runtime.load();
   const authPool = new Pool({ connectionString: config.authDatabaseUrl, max: 3, options: "-c search_path=auth", connectionTimeoutMillis: 1000 });
   authPool.on("error", () => app.log.error("认证数据库连接错误"));
   const jobs = new Jobs(database.primary, database.reader, config, options.captureMail);
-  const auth = createAuth(config, authPool, (to, subject, text, html) => jobs.mail(to, subject, text, html), async (id) => Boolean((await database.primary.query('SELECT 1 FROM core.admin_account a JOIN auth."user" u ON u.id::text=a.user_id WHERE a.user_id=$1 AND ($2 OR u."twoFactorEnabled"=true)', [id, options.requireAdminTwoFactor === false])).rowCount));
+  async function isAdmin(current: { id: string; email: string; emailVerified: boolean }) {
+    if (!current.emailVerified) return false;
+    return Boolean((await database.primary.query(`SELECT 1 FROM core.admin_account WHERE user_id=$1
+      UNION ALL SELECT 1 FROM core.admin_email WHERE email=lower($2)`, [current.id, current.email])).rowCount);
+  }
+  const auth = createAuth(config, authPool, (to, subject, text, html) => jobs.mail(to, subject, text, html), async (id) => {
+    const current = (await authPool.query('SELECT id,email,"emailVerified","twoFactorEnabled" FROM auth."user" WHERE id=$1', [id])).rows[0];
+    return Boolean(current && await isAdmin(current) && (options.requireAdminTwoFactor === false || current.twoFactorEnabled));
+  });
   app.addHook("onClose", async () => { await jobs.stop(); await authPool.end(); });
   await jobs.start(options.worker ?? false);
+  app.post<{ Body: { event_id: string; to: string; subject: string; text: string; html?: string } }>("/internal/site-mail", async (request, reply) => {
+    if (!config.blogMailSecret) throw new HttpError(503, "SITE_MAIL_NOT_CONFIGURED");
+    const timestamp = Number(request.headers["x-sm-timestamp"] ?? 0);
+    const signature = String(request.headers["x-sm-signature"] ?? "");
+    const raw = JSON.stringify(request.body);
+    if (!verifyWebhook(raw, request.body.event_id, timestamp, signature, config.blogMailSecret)) throw new HttpError(401, "INVALID_SITE_MAIL_SIGNATURE");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(request.body.to) || request.body.subject.length > 240 || request.body.text.length > 20_000 || (request.body.html?.length ?? 0) > 100_000) throw new HttpError(400, "INVALID_SITE_MAIL");
+    await jobs.mail(request.body.to, request.body.subject, request.body.text, request.body.html, `site-mail:${request.body.event_id}`);
+    return reply.code(202).send({ accepted: true, event_id: request.body.event_id });
+  });
   const configPoll = setInterval(() => { void runtime.sync().catch(() => app.log.warn("配置热更新同步失败")); }, 2000);
   configPoll.unref();
   app.addHook("onClose", async () => { clearInterval(configPoll); });
@@ -48,7 +79,7 @@ export async function registerPlatform(app: FastifyInstance, database: DatabaseR
   async function user(request: FastifyRequest) { return (await session(request)).user; }
   async function admin(request: FastifyRequest) {
     const current = await user(request);
-    if (!(await database.primary.query("SELECT 1 FROM core.admin_account WHERE user_id=$1", [current.id])).rowCount) throw new HttpError(403, "ADMIN_REQUIRED");
+    if (!await isAdmin(current)) throw new HttpError(403, "ADMIN_REQUIRED");
     if ((options.requireAdminTwoFactor ?? true) && !current.twoFactorEnabled) throw new HttpError(403, "TWO_FACTOR_REQUIRED");
     return current;
   }
@@ -61,8 +92,8 @@ export async function registerPlatform(app: FastifyInstance, database: DatabaseR
     });
     api.get("/v1/me", async (request) => {
       const current = await user(request);
-      const isAdmin = Boolean((await database.primary.query("SELECT 1 FROM core.admin_account WHERE user_id=$1", [current.id])).rowCount);
-      return { user: current, admin: isAdmin, admin_ready: isAdmin && (options.requireAdminTwoFactor === false || Boolean(current.twoFactorEnabled)) };
+      const administrator = await isAdmin(current);
+      return { user: current, admin: administrator, admin_ready: administrator && (options.requireAdminTwoFactor === false || Boolean(current.twoFactorEnabled)) };
     });
     api.get("/v1/config", async () => ({ github: Boolean(config.github), mail: Boolean(config.smtp || options.captureMail), storage: Boolean(config.storage), billing: Boolean(config.afdian), afdian: Boolean(config.afdian), afdian_oauth: Boolean(config.afdian?.oauth) }));
     api.get("/v1/admin/config", async (request) => {

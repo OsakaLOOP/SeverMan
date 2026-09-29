@@ -19,6 +19,7 @@
     "resource:register": "tsx scripts/register-resource.ts",
     "auth:generate": "tsx scripts/generate-auth.ts",
     "example:site": "tsx examples/site/server.ts",
+    "test:auth-browser": "tsx scripts/auth-browser-check.ts",
     "test:browser": "tsx scripts/browser-check.ts",
     "test:billing-browser": "tsx scripts/billing-browser-check.ts",
     "config:validate": "tsx scripts/config-validate.ts",

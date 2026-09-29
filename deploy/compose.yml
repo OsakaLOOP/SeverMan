@@ -32,6 +32,7 @@ services:
       QUEUE_DATABASE_URL: ${QUEUE_DATABASE_URL:?请配置队列数据库地址}
       AUTH_ORIGIN: ${AUTH_ORIGIN:?请配置登录来源}
       AUTH_SECRET: ${AUTH_SECRET:?请配置认证密钥}
+      AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -52,6 +53,7 @@ services:
       AFDIAN_OAUTH_CLIENT_SECRET: ${AFDIAN_OAUTH_CLIENT_SECRET:-}
       AFDIAN_WEBHOOK_PUBLIC_KEY: ${AFDIAN_WEBHOOK_PUBLIC_KEY:-}
       WEBHOOK_TARGETS_JSON: ${WEBHOOK_TARGETS_JSON:-}
+      BLOG_MAIL_SECRET: ${BLOG_MAIL_SECRET:-}
     networks: [database, ingress]
     depends_on:
       postgres: { condition: service_healthy }

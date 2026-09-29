@@ -244,3 +244,50 @@ test("全站撤销后中心与 BFF 会话无法继续访问", async () => {
   await local.admin.query("UPDATE site_example.sessions SET checked_at=now()-interval '31 seconds'");
   assert.equal((await site!.inject({ url: "/auth/me", headers: { cookie: siteCookie } })).statusCode, 401);
 });
+
+test("重复注册补发未验证邮箱，保留原密码，已验证用户不再发信", async () => {
+  const email = "repeat-signup@example.com";
+  const signup = (password: string) => app.inject({ remoteAddress: "127.0.0.21", method: "POST", url: "/api/auth/sign-up/email", headers: { origin }, payload: { email, password, name: "重复注册", callbackURL: `${origin}/verify-result?verified=1` } });
+  const first = await signup(password);
+  assert.equal(first.statusCode, 200);
+  await eventually(async () => mail.filter(item => item.to === email).length, count => count === 1);
+  const second = await signup("Different-password-123!");
+  assert.equal(second.statusCode, 200);
+  await eventually(async () => mail.filter(item => item.to === email).length, count => count === 2);
+  const verification = mail.filter(item => item.to === email).at(-1)!;
+  const link = new URL(verification.text.match(/https?:\/\/[^\s]+/)![0]);
+  const verified = await app.inject(link.pathname + link.search);
+  assert.equal(verified.statusCode, 302);
+  assert.equal(verified.headers.location, `${origin}/verify-result?verified=1`);
+  assert.equal((await signup(password)).statusCode, 200);
+  assert.equal(mail.filter(item => item.to === email).length, 2);
+  const signin = (value: string) => app.inject({ remoteAddress: "127.0.0.21", method: "POST", url: "/api/auth/sign-in/email", headers: { origin }, payload: { email, password: value } });
+  assert.equal((await signin("Different-password-123!")).statusCode, 401);
+  const login = await signin(password);
+  assert.equal(login.statusCode, 200);
+  assert.equal((await app.inject({ url: "/v1/me", headers: { cookie: cookies(login) } })).json().user.email, email);
+});
+
+test("管理员邮箱预留在验证后生效，重注册仍有效且运行角色不可改授权", async () => {
+  const email = "reserved-admin@example.com";
+  await local.admin.query("INSERT INTO core.admin_email(email) VALUES($1)", [email]);
+  await local.admin.query('DELETE FROM auth."rateLimit"');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await local.admin.query('DELETE FROM auth."rateLimit"');
+    const result = await app.inject({ remoteAddress: "127.0.0.21", method: "POST", url: "/api/auth/sign-up/email", headers: { origin }, payload: { email, password, name: "预留管理员" } });
+    assert.equal(result.statusCode, 200);
+    const signin = () => app.inject({ remoteAddress: "127.0.0.21", method: "POST", url: "/api/auth/sign-in/email", headers: { origin }, payload: { email, password } });
+    assert.equal((await signin()).statusCode, 403);
+    const verification = await eventually(async () => mail.filter(item => item.to === email)[attempt], Boolean);
+    const link = new URL(verification!.text.match(/https?:\/\/[^\s]+/)![0]);
+    await app.inject(link.pathname + link.search);
+    const login = await signin();
+    const me = await app.inject({ url: "/v1/me", headers: { cookie: cookies(login) } });
+    assert.equal(me.json().admin, true);
+    await local.admin.query('DELETE FROM auth."user" WHERE email=$1', [email]);
+  }
+  const runtime = new Pool({ connectionString: local.databaseUrl, max: 1 });
+  try { await assert.rejects(runtime.query("UPDATE core.admin_email SET email='attacker@example.com'"), /permission denied/); }
+  finally { await runtime.end(); }
+  await local.admin.query("DELETE FROM core.admin_email");
+});

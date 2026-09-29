@@ -77,3 +77,17 @@ bash deploy/backup.sh
 恢复顺序：取回 dump 和独立角色/密钥备份；创建角色及空数据库；设置 `RESTORE_DATABASE_URL`、`BACKUP_DUMP`、`CONFIRM_RESTORE=empty-database`；执行 `bash deploy/restore.sh`；核对权限、任务幂等记录和健康检查，再切换连接。恢复前仅准备角色，schema 由 dump 恢复；`db:provision` 会创建 schema，适用于首次初始化。
 
 首次上线完成恢复演练。目标 RPO/RTO 均为 1 小时，最近成功时间位于 `BACKUP_DIR/last-success`。
+
+## 管理员预留与认证密钥
+
+需要在用户注册前预留管理员时，先应用 `007_admin_email.sql`，再执行：
+
+```sh
+docker compose --env-file .env -f deploy/compose.yml --profile tools run --rm migrate npm run admin:bootstrap -- you@example.com --reserve
+```
+
+预留配置仅能由迁移身份写入。用户必须验证该邮箱才获得管理员身份；登录后进入 `/admin`，首次使用在页面引导下启用二次验证，之后才能执行管理操作。未验证的重复注册会补发邮件且保留原密码；已验证账号应登录或找回密码。
+
+`AUTH_SECRET` 同时用于会话、认证私钥及其他持久化密文。日常部署必须保持不变；修改前需制定密文迁移方案。若旧签名私钥无法解密，应优先恢复原密钥。只有明确授权的账号重置才可在备份后撤销会话、令牌、验证记录和旧签名密钥，并重建认证状态。
+
+`npm run test:auth-browser` 使用独立 PostgreSQL 和捕获邮箱检查完整认证流程，不发送外部邮件，需要已安装 Playwright Chromium。

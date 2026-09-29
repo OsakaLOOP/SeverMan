@@ -60,7 +60,7 @@ export function buildApp(config: Config, platform?: PlatformOptions) {
     const root = resolve("web/dist");
     if (existsSync(root)) {
       app.register(serveStatic, { root, prefix: "/" });
-      for (const url of ["/", "/sign-in", "/sign-up", "/consent", "/reset-password", "/verify-result"]) app.get(url, (_request, reply) => reply.type("text/html").sendFile("index.html"));
+      for (const url of ["/", "/sign-in", "/sign-up", "/consent", "/reset-password", "/verify-result", "/admin", "/app"]) app.get(url, (_request, reply) => reply.type("text/html").sendFile("index.html"));
     }
   }
   return app;

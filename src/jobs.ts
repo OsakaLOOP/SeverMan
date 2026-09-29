@@ -108,9 +108,9 @@ export class Jobs {
       await delay(100);
     }
   }
-  async mail(to: string, subject: string, text: string, html?: string) {
+  async mail(to: string, subject: string, text: string, html?: string, idempotencyKey?: string) {
     if (!this.transport && !this.captureMail) throw new HttpError(503, "MAIL_UNAVAILABLE");
-    await this.submit("system-mail", "mail", { to, subject, text, ...(html ? { html } : {}) }, randomUUID());
+    await this.submit("system-mail", "mail", { to, subject, text, ...(html ? { html } : {}) }, idempotencyKey ?? randomUUID());
   }
   private async execute(id: string) {
     const operation = (await this.primary.query<Operation>("SELECT * FROM core.operations WHERE id=$1", [id])).rows[0];

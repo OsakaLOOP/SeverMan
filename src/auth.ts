@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { createEmailVerificationToken } from "better-auth/api";
 import { jwt, twoFactor } from "better-auth/plugins";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import type { Pool } from "pg";
@@ -14,12 +15,19 @@ export function createAuth(config: PlatformConfig, pool: Pool, sendMail: SendMai
     basePath: "/api/auth",
     secret: config.secret,
     database: pool,
-    trustedOrigins: [config.origin],
+    trustedOrigins: [config.origin, ...(config.trustedOrigins ?? [])],
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 12,
       requireEmailVerification: config.requireVerification,
       revokeSessionsOnPasswordReset: true,
+      onExistingUserSignUp: async ({ user }) => {
+        if (user.emailVerified || !config.requireVerification) return;
+        const token = await createEmailVerificationToken(config.secret, user.email);
+        const url = `${config.origin}/api/auth/verify-email?token=${token}&callbackURL=${encodeURIComponent(`${config.origin}/verify-result?verified=1`)}`;
+        const mail = verificationEmail(url);
+        await sendMail(user.email, mail.subject, mail.text, mail.html);
+      },
       sendResetPassword: async ({ user, url }) => {
         const mail = resetPasswordEmail(url);
         await sendMail(user.email, mail.subject, mail.text, mail.html);

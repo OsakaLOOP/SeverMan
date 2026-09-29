@@ -4,6 +4,7 @@ import { AFDIAN_PUBLIC_KEY, type AfdianConfig } from "./afdian-client.js";
 export interface PlatformConfig {
   origin: string;
   secret: string;
+  trustedOrigins?: string[];
   authDatabaseUrl: string;
   queueDatabaseUrl: string;
   requireVerification: boolean;
@@ -12,6 +13,7 @@ export interface PlatformConfig {
   storage?: { endpoint: string; region: string; bucket: string; keyId: string; keySecret: string };
   afdian?: AfdianConfig;
   webhookTargets: Record<string, { url: string; secret: string; commands?: Record<string, "user" | "admin"> }>;
+  blogMailSecret?: string;
 }
 
 export function readPlatformConfig(env = process.env): PlatformConfig {
@@ -22,8 +24,14 @@ export function readPlatformConfig(env = process.env): PlatformConfig {
   if (!env.AUTH_DATABASE_URL || !env.QUEUE_DATABASE_URL) throw new Error("缺少认证或任务数据库连接");
   const config: PlatformConfig = {
     origin, secret, authDatabaseUrl: env.AUTH_DATABASE_URL, queueDatabaseUrl: env.QUEUE_DATABASE_URL,
+    trustedOrigins: (env.AUTH_TRUSTED_ORIGINS ?? "").split(",").filter(Boolean).map(value => {
+      const url = new URL(value.trim());
+      if (url.origin !== value.trim() || url.username || url.password || (env.NODE_ENV === "production" && url.protocol !== "https:")) throw new Error("AUTH_TRUSTED_ORIGINS 必须是完整 HTTPS origin");
+      return url.origin;
+    }),
     requireVerification: true,
     webhookTargets: {},
+    ...(env.BLOG_MAIL_SECRET ? { blogMailSecret: env.BLOG_MAIL_SECRET } : {}),
   };
   if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) config.github = { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET };
   if (env.SMTP_HOST && env.SMTP_FROM) config.smtp = { host: env.SMTP_HOST, port: Number(env.SMTP_PORT ?? 587), secure: env.SMTP_SECURE === "true", user: env.SMTP_USER ?? "", password: env.SMTP_PASSWORD ?? "", from: env.SMTP_FROM };
